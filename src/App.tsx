@@ -1,16 +1,136 @@
-import { useReducer } from "react";
-import { PatternGrid, PatternThumbnail } from "./components/lab/PatternGrid";
-import { createLabState, labReducer, PRESETS } from "./components/lab/patterns";
+import { useMemo, useReducer, useState } from 'react';
+import { PatternGrid, PatternThumbnail } from './components/lab/PatternGrid';
+import {
+  blankPattern,
+  createLabState,
+  labReducer,
+  PRESETS,
+} from './components/lab/patterns';
+import type { Cell, PatternCells } from './components/lab/patterns';
+import { createWeightMatrix } from './engine/hebbian';
+import { recall } from './engine/recall';
+import { addNoise } from './experiments/noise';
 
-const panel = "rounded-xl border border-slate-200 bg-white p-5 sm:p-6";
-const heading = "text-base font-semibold tracking-tight text-slate-900";
-const help = "text-sm leading-6 text-slate-500";
+const panel = 'rounded-xl border border-slate-200 bg-white p-5 sm:p-6';
+const heading = 'text-base font-semibold tracking-tight text-slate-900';
+const help = 'text-sm leading-6 text-slate-500';
+
+function WeightMatrixPreview({ weights }: { weights: number[][] }) {
+  return (
+    <section className={panel} aria-labelledby="weights-heading">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 id="weights-heading" className={heading}>
+            Weight matrix
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            64 × 64 Hebbian connection weights
+          </p>
+        </div>
+        <span className="text-xs tabular-nums text-slate-500">
+          {weights.length === 0 ? 'No weights' : '4,096 values'}
+        </span>
+      </div>
+      {weights.length === 0 ? (
+        <div className="rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500">
+          Store a pattern to calculate the weights.
+        </div>
+      ) : (
+        <div
+          className="max-h-80 overflow-auto rounded-lg border border-slate-200"
+          tabIndex={0}
+          aria-label="Scrollable 64 by 64 weight matrix"
+        >
+          <table className="border-separate border-spacing-0 font-mono text-[11px] tabular-nums text-slate-600">
+            <thead>
+              <tr>
+                <th className="sticky top-0 left-0 z-20 border-r border-b border-slate-200 bg-slate-100 px-2 py-1.5 text-slate-500">
+                  i\j
+                </th>
+                {weights.map((_, column) => (
+                  <th
+                    key={column}
+                    scope="col"
+                    className="sticky top-0 z-10 min-w-14 border-b border-slate-200 bg-slate-100 px-2 py-1.5 font-medium text-slate-500"
+                  >
+                    {column + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {weights.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  <th
+                    scope="row"
+                    className="sticky left-0 border-r border-b border-slate-200 bg-slate-100 px-2 py-1.5 font-medium text-slate-500"
+                  >
+                    {rowIndex + 1}
+                  </th>
+                  {row.map((weight, columnIndex) => (
+                    <td
+                      key={columnIndex}
+                      className={`border-r border-b border-slate-100 px-2 py-1.5 text-right ${rowIndex === columnIndex ? 'bg-slate-50 text-slate-400' : 'bg-white'}`}
+                    >
+                      {weight.toFixed(3)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function App() {
   const [state, dispatch] = useReducer(labReducer, undefined, createLabState);
+  const [noisePercentage, setNoisePercentage] = useState(0);
+  const [recalled, setRecalled] = useState<PatternCells | null>(null);
   const selected = state.stored.find(
-    (pattern) => pattern.id === state.selectedId,
+    (pattern) => pattern.id === state.selectedId
   );
+  const weights = useMemo(
+    () =>
+      state.stored.length === 0
+        ? []
+        : createWeightMatrix(
+            state.stored.map((pattern) => Array.from(pattern.cells))
+          ),
+    [state.stored]
+  );
+
+  function selectPattern(id: string) {
+    dispatch({ type: 'select', id });
+    setNoisePercentage(0);
+    setRecalled(null);
+  }
+
+  function changeNoise(percentage: number) {
+    if (!selected) return;
+    setNoisePercentage(percentage);
+    dispatch({
+      type: 'cue',
+      cells: addNoise(selected.cells, percentage, `noise-${selected.id}`),
+    });
+    setRecalled(null);
+  }
+
+  function resetExperiment() {
+    dispatch({ type: 'restore-cue' });
+    setNoisePercentage(0);
+    setRecalled(null);
+  }
+
+  function runRecall() {
+    if (!state.cue || weights.length === 0) return;
+    const result = recall(weights, Array.from(state.cue), 'recall', {
+      maxSweeps: 100,
+    });
+    setRecalled(result.finalState.map((cell): Cell => (cell === 1 ? 1 : -1)));
+  }
 
   return (
     <div className="min-h-screen min-w-[320px] bg-slate-50 font-sans text-slate-800 antialiased scheme-light [&_button]:cursor-pointer [&_button]:touch-manipulation [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-solid [&_button:focus-visible]:outline-blue-600 [&_button:focus-visible]:outline-offset-4">
@@ -47,7 +167,7 @@ function App() {
               <PatternGrid
                 label="Drawing"
                 cells={state.draft}
-                onChange={(cells) => dispatch({ type: "draft", cells })}
+                onChange={(cells) => dispatch({ type: 'draft', cells })}
                 resetLabel="Clear drawing"
               />
             </div>
@@ -66,7 +186,7 @@ function App() {
                     type="button"
                     className="flex flex-col items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-1 py-3 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50"
                     aria-label={`Load ${preset.name} into drawing`}
-                    onClick={() => dispatch({ type: "preset", id: preset.id })}
+                    onClick={() => dispatch({ type: 'preset', id: preset.id })}
                   >
                     <PatternThumbnail cells={preset.cells} />
                     <span>{preset.name}</span>
@@ -79,7 +199,9 @@ function App() {
               className="mt-6"
               onSubmit={(event) => {
                 event.preventDefault();
-                dispatch({ type: "store" });
+                dispatch({ type: 'store' });
+                setNoisePercentage(0);
+                setRecalled(null);
               }}
             >
               <label
@@ -95,7 +217,7 @@ function App() {
                 maxLength={40}
                 placeholder="Name your pattern"
                 onChange={(event) =>
-                  dispatch({ type: "name", name: event.target.value })
+                  dispatch({ type: 'name', name: event.target.value })
                 }
               />
               <button
@@ -111,7 +233,7 @@ function App() {
             <section className={panel} aria-labelledby="library-heading">
               <div className="mb-4 flex items-baseline justify-between gap-3">
                 <h2 id="library-heading" className={heading}>
-                  Stored patterns{" "}
+                  Stored patterns{' '}
                   <span className="ml-1 text-sm font-normal tabular-nums text-slate-500">
                     ({state.stored.length})
                   </span>
@@ -136,9 +258,7 @@ function App() {
                         type="button"
                         aria-pressed={pattern.id === state.selectedId}
                         aria-label={`Select ${pattern.name}, stored pattern ${index + 1}`}
-                        onClick={() =>
-                          dispatch({ type: "select", id: pattern.id })
-                        }
+                        onClick={() => selectPattern(pattern.id)}
                         className="group flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 p-3 text-left hover:bg-slate-50 aria-pressed:border-blue-600 aria-pressed:bg-blue-50"
                       >
                         <PatternThumbnail cells={pattern.cells} />
@@ -147,14 +267,14 @@ function App() {
                             {pattern.name}
                           </strong>
                           <span className="mt-1 block text-xs text-slate-500">
-                            Pattern {String(index + 1).padStart(2, "0")}
+                            Pattern {String(index + 1).padStart(2, '0')}
                           </span>
                         </span>
                         <span
                           className="shrink-0 text-blue-700"
                           aria-hidden="true"
                         >
-                          {pattern.id === state.selectedId ? "✓" : "○"}
+                          {pattern.id === state.selectedId ? '✓' : '○'}
                         </span>
                       </button>
                     ))}
@@ -167,15 +287,42 @@ function App() {
             </section>
 
             <section className={panel} aria-labelledby="comparison-heading">
+              <h2 id="comparison-heading" className={heading}>
+                Recall experiment
+              </h2>
               {selected && state.cue ? (
                 <>
-                  <p className="mt-1 mb-6 text-sm text-slate-500 wrap-anywhere">
-                    Recall target:{" "}
+                  <p className="mt-1 text-sm text-slate-500 wrap-anywhere">
+                    Recall target:{' '}
                     <strong className="font-medium text-slate-700">
                       {selected.name}
                     </strong>
                   </p>
-                  <div className="grid gap-7 sm:grid-cols-2 sm:gap-6">
+                  <div className="my-6 flex flex-wrap items-end gap-4 rounded-lg bg-slate-50 p-4">
+                    <label className="min-w-56 flex-1 text-sm font-medium text-slate-700">
+                      Noise:{' '}
+                      <span className="tabular-nums">{noisePercentage}%</span>
+                      <input
+                        className="mt-2 block w-full accent-blue-600"
+                        type="range"
+                        min="0"
+                        max="50"
+                        step="5"
+                        value={noisePercentage}
+                        onChange={(event) =>
+                          changeNoise(Number(event.target.value))
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={runRecall}
+                      className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700"
+                    >
+                      Recall
+                    </button>
+                  </div>
+                  <div className="grid gap-7 md:grid-cols-3 md:gap-5">
                     <div className="mx-auto w-full max-w-sm">
                       <div className="mb-3">
                         <h3 className="text-sm font-semibold">Original</h3>
@@ -191,7 +338,7 @@ function App() {
                     </div>
                     <div className="mx-auto w-full max-w-sm">
                       <div className="mb-3">
-                        <h3 className="text-sm font-semibold">Cue</h3>
+                        <h3 className="text-sm font-semibold">Damaged cue</h3>
                         <p className="mt-1 text-xs text-slate-500">
                           Editable copy
                         </p>
@@ -199,9 +346,33 @@ function App() {
                       <PatternGrid
                         label="Cue"
                         cells={state.cue}
-                        onChange={(cells) => dispatch({ type: "cue", cells })}
-                        onReset={() => dispatch({ type: "restore-cue" })}
-                        resetLabel="Restore cue"
+                        onChange={(cells) => {
+                          dispatch({ type: 'cue', cells });
+                          setRecalled(null);
+                        }}
+                        onReset={resetExperiment}
+                        resetLabel="Reset"
+                      />
+                    </div>
+                    <div className="mx-auto w-full max-w-sm">
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold">
+                          Recalled output
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {recalled
+                            ? 'Final network state'
+                            : 'Run recall to calculate'}
+                        </p>
+                      </div>
+                      <PatternGrid
+                        label={
+                          recalled
+                            ? 'Recalled output'
+                            : 'Recalled output, not run'
+                        }
+                        cells={recalled ?? blankPattern()}
+                        readOnly
                       />
                     </div>
                   </div>
@@ -218,6 +389,8 @@ function App() {
                 </div>
               )}
             </section>
+
+            <WeightMatrixPreview weights={weights} />
           </div>
         </div>
 
