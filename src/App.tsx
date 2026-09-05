@@ -9,7 +9,6 @@ import {
 import type { Cell, PatternCells } from './components/lab/patterns';
 import { createWeightMatrix } from './engine/hebbian';
 import { recall } from './engine/recall';
-import { addNoise } from './experiments/noise';
 
 const panel = 'rounded-xl border border-slate-200 bg-white p-5 sm:p-6';
 const heading = 'text-base font-semibold tracking-tight text-slate-900';
@@ -87,7 +86,6 @@ function WeightMatrixPreview({ weights }: { weights: number[][] }) {
 
 function App() {
   const [state, dispatch] = useReducer(labReducer, undefined, createLabState);
-  const [noisePercentage, setNoisePercentage] = useState(0);
   const [recalled, setRecalled] = useState<PatternCells | null>(null);
   const selected = state.stored.find(
     (pattern) => pattern.id === state.selectedId
@@ -104,23 +102,11 @@ function App() {
 
   function selectPattern(id: string) {
     dispatch({ type: 'select', id });
-    setNoisePercentage(0);
-    setRecalled(null);
-  }
-
-  function changeNoise(percentage: number) {
-    if (!selected) return;
-    setNoisePercentage(percentage);
-    dispatch({
-      type: 'cue',
-      cells: addNoise(selected.cells, percentage, `noise-${selected.id}`),
-    });
     setRecalled(null);
   }
 
   function resetExperiment() {
     dispatch({ type: 'restore-cue' });
-    setNoisePercentage(0);
     setRecalled(null);
   }
 
@@ -200,7 +186,6 @@ function App() {
               onSubmit={(event) => {
                 event.preventDefault();
                 dispatch({ type: 'store' });
-                setNoisePercentage(0);
                 setRecalled(null);
               }}
             >
@@ -298,22 +283,7 @@ function App() {
                       {selected.name}
                     </strong>
                   </p>
-                  <div className="my-6 flex flex-wrap items-end gap-4 rounded-lg bg-slate-50 p-4">
-                    <label className="min-w-56 flex-1 text-sm font-medium text-slate-700">
-                      Noise:{' '}
-                      <span className="tabular-nums">{noisePercentage}%</span>
-                      <input
-                        className="mt-2 block w-full accent-blue-600"
-                        type="range"
-                        min="0"
-                        max="50"
-                        step="5"
-                        value={noisePercentage}
-                        onChange={(event) =>
-                          changeNoise(Number(event.target.value))
-                        }
-                      />
-                    </label>
+                  <div className="my-6 flex justify-end">
                     <button
                       type="button"
                       onClick={runRecall}
