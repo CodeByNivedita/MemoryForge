@@ -1,3 +1,5 @@
+import type { RecallMetrics } from "../../experiments";
+
 export const GRID_SIZE = 8;
 export const CELL_COUNT = GRID_SIZE * GRID_SIZE;
 export type Cell = -1 | 1;
@@ -107,6 +109,11 @@ export interface LabState {
   readonly stored: readonly StoredPattern[];
   readonly selectedId: string | null;
   readonly cue: PatternCells | null;
+
+  // Hopfield recall result
+  readonly recalled: PatternCells | null;
+  readonly recallMetrics: RecallMetrics | null;
+
   readonly nextNumber: number;
   readonly announcement: string;
 }
@@ -118,6 +125,10 @@ export function createLabState(): LabState {
     stored: [],
     selectedId: null,
     cue: null,
+
+    recalled: null,
+    recallMetrics: null,
+
     nextNumber: 1,
     announcement: "",
   };
@@ -130,7 +141,12 @@ export type LabAction =
   | { type: "store" }
   | { type: "select"; id: string }
   | { type: "cue"; cells: PatternCells }
-  | { type: "restore-cue" };
+  | { type: "restore-cue" }
+  | {
+      type: "recall-result";
+      recalled: PatternCells;
+      recallMetrics: RecallMetrics;
+    };
 
 export function labReducer(state: LabState, action: LabAction): LabState {
   switch (action.type) {
@@ -150,6 +166,15 @@ export function labReducer(state: LabState, action: LabAction): LabState {
           }
         : state;
     }
+    case "recall-result":
+      assertPattern(action.recalled);
+
+      return {
+      ...state,
+      recalled: [...action.recalled],
+      recallMetrics: action.recallMetrics,
+      announcement: "Recall completed.",
+      };
     case "store": {
       const pattern: StoredPattern = {
         id: `pattern-${state.nextNumber}`,
@@ -173,14 +198,22 @@ export function labReducer(state: LabState, action: LabAction): LabState {
             ...state,
             selectedId: pattern.id,
             cue: [...pattern.cells],
+            recalled: null,
+            recallMetrics: null,
             announcement: `${pattern.name} selected. Cue restored from its original.`,
           }
         : state;
     }
     case "cue":
-      if (!state.selectedId) return state;
-      assertPattern(action.cells);
-      return { ...state, cue: [...action.cells] };
+  if (!state.selectedId) return state;
+  assertPattern(action.cells);
+
+  return {
+    ...state,
+    cue: [...action.cells],
+    recalled: null,
+    recallMetrics: null,
+  };
     case "restore-cue": {
       const pattern = state.stored.find((item) => item.id === state.selectedId);
       return pattern
@@ -188,6 +221,8 @@ export function labReducer(state: LabState, action: LabAction): LabState {
             ...state,
             cue: [...pattern.cells],
             announcement: `Cue restored from ${pattern.name}.`,
+            recalled: null,
+            recallMetrics: null,
           }
         : state;
     }
