@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { PatternGrid, PatternThumbnail } from './components/lab/PatternGrid';
 import {
   blankPattern,
@@ -9,6 +9,7 @@ import {
 import type { Cell, PatternCells } from './components/lab/patterns';
 import { createWeightMatrix } from './engine/hebbian';
 import { recall } from './engine/recall';
+import { generateNoisyCopy } from './experiments';
 
 const panel = 'rounded-xl border border-slate-200 bg-white p-5 sm:p-6';
 const heading = 'text-base font-semibold tracking-tight text-slate-900';
@@ -86,7 +87,11 @@ function WeightMatrixPreview({ weights }: { weights: number[][] }) {
 
 function App() {
   const [state, dispatch] = useReducer(labReducer, undefined, createLabState);
-  const [recalled, setRecalled] = useState<PatternCells | null>(null);
+  const [noisePercentage, setNoisePercentage] = useState(0);
+  const [trace, setTrace] = useState<readonly PatternCells[]>([]);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const selected = state.stored.find(
     (pattern) => pattern.id === state.selectedId
   );
@@ -100,14 +105,44 @@ function App() {
     [state.stored]
   );
 
+  const displayedRecall = trace[frameIndex] ?? null;
+  const finalFrameIndex = Math.max(0, trace.length - 1);
+
+  useEffect(() => {
+    if (!isPlaying || trace.length === 0) return;
+
+    const nextFrame = Math.min(frameIndex + 1, trace.length - 1);
+    const timer = window.setTimeout(() => {
+      setFrameIndex(nextFrame);
+      if (nextFrame >= trace.length - 1) setIsPlaying(false);
+    }, 700 / playbackSpeed);
+    return () => window.clearTimeout(timer);
+  }, [frameIndex, isPlaying, playbackSpeed, trace.length]);
+
+  function clearPlayback() {
+    setTrace([]);
+    setFrameIndex(0);
+    setIsPlaying(false);
+  }
+
   function selectPattern(id: string) {
     dispatch({ type: 'select', id });
-    setRecalled(null);
+    setNoisePercentage(0);
+    clearPlayback();
   }
 
   function resetExperiment() {
     dispatch({ type: 'restore-cue' });
-    setRecalled(null);
+    setNoisePercentage(0);
+    clearPlayback();
+  }
+
+  function applyNoise(percentage: number) {
+    if (!selected) return;
+    const noisyCopy = generateNoisyCopy(selected.cells, percentage, 42);
+    setNoisePercentage(percentage);
+    dispatch({ type: 'cue', cells: noisyCopy.cells });
+    clearPlayback();
   }
 
   function runRecall() {
@@ -115,7 +150,15 @@ function App() {
     const result = recall(weights, Array.from(state.cue), 'recall', {
       maxSweeps: 100,
     });
-    setRecalled(result.finalState.map((cell): Cell => (cell === 1 ? 1 : -1)));
+    const recordedStates: PatternCells[] = [
+      [...state.cue],
+      ...result.snapshots.map((snapshot) =>
+        snapshot.map((cell): Cell => (cell === 1 ? 1 : -1))
+      ),
+    ];
+    setTrace(recordedStates);
+    setFrameIndex(0);
+    setIsPlaying(recordedStates.length > 1);
   }
 
   return (
@@ -186,7 +229,8 @@ function App() {
               onSubmit={(event) => {
                 event.preventDefault();
                 dispatch({ type: 'store' });
-                setRecalled(null);
+                setNoisePercentage(0);
+                clearPlayback();
               }}
             >
               <label
@@ -283,7 +327,39 @@ function App() {
                       {selected.name}
                     </strong>
                   </p>
-                  <div className="my-6 flex justify-end">
+                  <div className="my-6 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <div>
+                      <div className="flex items-center justify-between gap-4">
+                        <label
+                          htmlFor="noise-percentage"
+                          className="text-sm font-medium text-slate-700"
+                        >
+                          Cue damage
+                        </label>
+                        <output
+                          htmlFor="noise-percentage"
+                          className="text-sm font-semibold tabular-nums text-slate-900"
+                        >
+                          {noisePercentage}%
+                        </output>
+                      </div>
+                      <input
+                        id="noise-percentage"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={noisePercentage}
+                        onChange={(event) =>
+                          applyNoise(Number(event.target.value))
+                        }
+                        className="mt-3 h-2 w-full cursor-pointer accent-blue-600"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Reproducibly flips pixels in a fresh copy of the
+                        original.
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={runRecall}
@@ -318,7 +394,16 @@ function App() {
                         cells={state.cue}
                         onChange={(cells) => {
                           dispatch({ type: 'cue', cells });
-                          setRecalled(null);
+                          setNoisePercentage(
+                            Math.round(
+                              (cells.filter(
+                                (cell, index) => cell !== selected.cells[index]
+                              ).length /
+                                cells.length) *
+                                100
+                            )
+                          );
+                          clearPlayback();
                         }}
                         onReset={resetExperiment}
                         resetLabel="Reset"
@@ -330,21 +415,109 @@ function App() {
                           Recalled output
                         </h3>
                         <p className="mt-1 text-xs text-slate-500">
-                          {recalled
-                            ? 'Final network state'
+                          {displayedRecall
+                            ? frameIndex === 0
+                              ? 'Recorded input cue'
+                              : `Recorded sweep ${frameIndex} of ${finalFrameIndex}`
                             : 'Run recall to calculate'}
                         </p>
                       </div>
                       <PatternGrid
                         label={
-                          recalled
-                            ? 'Recalled output'
+                          displayedRecall
+                            ? frameIndex === 0
+                              ? 'Recall input cue'
+                              : `Recalled output at sweep ${frameIndex}`
                             : 'Recalled output, not run'
                         }
-                        cells={recalled ?? blankPattern()}
+                        cells={displayedRecall ?? blankPattern()}
                         readOnly
                       />
                     </div>
+                  </div>
+                  <div className="mt-7 border-t border-slate-100 pt-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={trace.length === 0 || isPlaying}
+                        onClick={() => {
+                          if (frameIndex >= finalFrameIndex) setFrameIndex(0);
+                          setIsPlaying(true);
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Play
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!isPlaying}
+                        onClick={() => setIsPlaying(false)}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Pause
+                      </button>
+                      <button
+                        type="button"
+                        disabled={trace.length === 0 || frameIndex === 0}
+                        onClick={() => {
+                          setIsPlaying(false);
+                          setFrameIndex((index) => Math.max(0, index - 1));
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Previous sweep
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          trace.length === 0 || frameIndex >= finalFrameIndex
+                        }
+                        onClick={() => {
+                          setIsPlaying(false);
+                          setFrameIndex((index) =>
+                            Math.min(finalFrameIndex, index + 1)
+                          );
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Next sweep
+                      </button>
+                      <button
+                        type="button"
+                        disabled={trace.length === 0}
+                        onClick={() => {
+                          setFrameIndex(0);
+                          setIsPlaying(trace.length > 1);
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Restart playback
+                      </button>
+                      <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
+                        Speed
+                        <select
+                          value={playbackSpeed}
+                          onChange={(event) =>
+                            setPlaybackSpeed(Number(event.target.value))
+                          }
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-800 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                        >
+                          <option value={0.5}>0.5×</option>
+                          <option value={1}>1×</option>
+                          <option value={2}>2×</option>
+                        </select>
+                      </label>
+                    </div>
+                    <p
+                      className="mt-3 text-xs text-slate-500"
+                      aria-live="polite"
+                    >
+                      {trace.length === 0
+                        ? 'Run recall to record the computed sweep states.'
+                        : frameIndex === 0
+                          ? `Input cue · ${finalFrameIndex} recorded ${finalFrameIndex === 1 ? 'sweep' : 'sweeps'}`
+                          : `Sweep ${frameIndex} of ${finalFrameIndex}${frameIndex === finalFrameIndex ? ' · final state' : ''}`}
+                    </p>
                   </div>
                 </>
               ) : (
