@@ -1,16 +1,165 @@
-import { useReducer } from "react";
-import { PatternGrid, PatternThumbnail } from "./components/lab/PatternGrid";
-import { createLabState, labReducer, PRESETS } from "./components/lab/patterns";
+import { useEffect, useMemo, useReducer, useState } from 'react';
+import { PatternGrid, PatternThumbnail } from './components/lab/PatternGrid';
+import {
+  blankPattern,
+  createLabState,
+  labReducer,
+  PRESETS,
+} from './components/lab/patterns';
+import type { Cell, PatternCells } from './components/lab/patterns';
+import { createWeightMatrix } from './engine/hebbian';
+import { recall } from './engine/recall';
+import { generateNoisyCopy } from './experiments';
 
-const panel = "rounded-xl border border-slate-200 bg-white p-5 sm:p-6";
-const heading = "text-base font-semibold tracking-tight text-slate-900";
-const help = "text-sm leading-6 text-slate-500";
+const panel = 'rounded-xl border border-slate-200 bg-white p-5 sm:p-6';
+const heading = 'text-base font-semibold tracking-tight text-slate-900';
+const help = 'text-sm leading-6 text-slate-500';
+
+function WeightMatrixPreview({ weights }: { weights: number[][] }) {
+  return (
+    <section className={panel} aria-labelledby="weights-heading">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 id="weights-heading" className={heading}>
+            Weight matrix
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            64 × 64 Hebbian connection weights
+          </p>
+        </div>
+        <span className="text-xs tabular-nums text-slate-500">
+          {weights.length === 0 ? 'No weights' : '4,096 values'}
+        </span>
+      </div>
+      {weights.length === 0 ? (
+        <div className="rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500">
+          Store a pattern to calculate the weights.
+        </div>
+      ) : (
+        <div
+          className="max-h-80 overflow-auto rounded-lg border border-slate-200"
+          tabIndex={0}
+          aria-label="Scrollable 64 by 64 weight matrix"
+        >
+          <table className="border-separate border-spacing-0 font-mono text-[11px] tabular-nums text-slate-600">
+            <thead>
+              <tr>
+                <th className="sticky top-0 left-0 z-20 border-r border-b border-slate-200 bg-slate-100 px-2 py-1.5 text-slate-500">
+                  i\j
+                </th>
+                {weights.map((_, column) => (
+                  <th
+                    key={column}
+                    scope="col"
+                    className="sticky top-0 z-10 min-w-14 border-b border-slate-200 bg-slate-100 px-2 py-1.5 font-medium text-slate-500"
+                  >
+                    {column + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {weights.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  <th
+                    scope="row"
+                    className="sticky left-0 border-r border-b border-slate-200 bg-slate-100 px-2 py-1.5 font-medium text-slate-500"
+                  >
+                    {rowIndex + 1}
+                  </th>
+                  {row.map((weight, columnIndex) => (
+                    <td
+                      key={columnIndex}
+                      className={`border-r border-b border-slate-100 px-2 py-1.5 text-right ${rowIndex === columnIndex ? 'bg-slate-50 text-slate-400' : 'bg-white'}`}
+                    >
+                      {weight.toFixed(3)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function App() {
   const [state, dispatch] = useReducer(labReducer, undefined, createLabState);
+  const [noisePercentage, setNoisePercentage] = useState(0);
+  const [trace, setTrace] = useState<readonly PatternCells[]>([]);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const selected = state.stored.find(
-    (pattern) => pattern.id === state.selectedId,
+    (pattern) => pattern.id === state.selectedId
   );
+  const weights = useMemo(
+    () =>
+      state.stored.length === 0
+        ? []
+        : createWeightMatrix(
+            state.stored.map((pattern) => Array.from(pattern.cells))
+          ),
+    [state.stored]
+  );
+
+  const displayedRecall = trace[frameIndex] ?? null;
+  const finalFrameIndex = Math.max(0, trace.length - 1);
+
+  useEffect(() => {
+    if (!isPlaying || trace.length === 0) return;
+
+    const nextFrame = Math.min(frameIndex + 1, trace.length - 1);
+    const timer = window.setTimeout(() => {
+      setFrameIndex(nextFrame);
+      if (nextFrame >= trace.length - 1) setIsPlaying(false);
+    }, 700 / playbackSpeed);
+    return () => window.clearTimeout(timer);
+  }, [frameIndex, isPlaying, playbackSpeed, trace.length]);
+
+  function clearPlayback() {
+    setTrace([]);
+    setFrameIndex(0);
+    setIsPlaying(false);
+  }
+
+  function selectPattern(id: string) {
+    dispatch({ type: 'select', id });
+    setNoisePercentage(0);
+    clearPlayback();
+  }
+
+  function resetExperiment() {
+    dispatch({ type: 'restore-cue' });
+    setNoisePercentage(0);
+    clearPlayback();
+  }
+
+  function applyNoise(percentage: number) {
+    if (!selected) return;
+    const noisyCopy = generateNoisyCopy(selected.cells, percentage, 42);
+    setNoisePercentage(percentage);
+    dispatch({ type: 'cue', cells: noisyCopy.cells });
+    clearPlayback();
+  }
+
+  function runRecall() {
+    if (!state.cue || weights.length === 0) return;
+    const result = recall(weights, Array.from(state.cue), 'recall', {
+      maxSweeps: 100,
+    });
+    const recordedStates: PatternCells[] = [
+      [...state.cue],
+      ...result.snapshots.map((snapshot) =>
+        snapshot.map((cell): Cell => (cell === 1 ? 1 : -1))
+      ),
+    ];
+    setTrace(recordedStates);
+    setFrameIndex(0);
+    setIsPlaying(recordedStates.length > 1);
+  }
 
   return (
     <div className="min-h-screen min-w-[320px] bg-slate-50 font-sans text-slate-800 antialiased scheme-light [&_button]:cursor-pointer [&_button]:touch-manipulation [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-solid [&_button:focus-visible]:outline-blue-600 [&_button:focus-visible]:outline-offset-4">
@@ -47,7 +196,7 @@ function App() {
               <PatternGrid
                 label="Drawing"
                 cells={state.draft}
-                onChange={(cells) => dispatch({ type: "draft", cells })}
+                onChange={(cells) => dispatch({ type: 'draft', cells })}
                 resetLabel="Clear drawing"
               />
             </div>
@@ -66,7 +215,7 @@ function App() {
                     type="button"
                     className="flex flex-col items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-1 py-3 text-sm text-slate-600 hover:border-slate-400 hover:bg-slate-50"
                     aria-label={`Load ${preset.name} into drawing`}
-                    onClick={() => dispatch({ type: "preset", id: preset.id })}
+                    onClick={() => dispatch({ type: 'preset', id: preset.id })}
                   >
                     <PatternThumbnail cells={preset.cells} />
                     <span>{preset.name}</span>
@@ -79,7 +228,9 @@ function App() {
               className="mt-6"
               onSubmit={(event) => {
                 event.preventDefault();
-                dispatch({ type: "store" });
+                dispatch({ type: 'store' });
+                setNoisePercentage(0);
+                clearPlayback();
               }}
             >
               <label
@@ -95,7 +246,7 @@ function App() {
                 maxLength={40}
                 placeholder="Name your pattern"
                 onChange={(event) =>
-                  dispatch({ type: "name", name: event.target.value })
+                  dispatch({ type: 'name', name: event.target.value })
                 }
               />
               <button
@@ -111,7 +262,7 @@ function App() {
             <section className={panel} aria-labelledby="library-heading">
               <div className="mb-4 flex items-baseline justify-between gap-3">
                 <h2 id="library-heading" className={heading}>
-                  Stored patterns{" "}
+                  Stored patterns{' '}
                   <span className="ml-1 text-sm font-normal tabular-nums text-slate-500">
                     ({state.stored.length})
                   </span>
@@ -136,9 +287,7 @@ function App() {
                         type="button"
                         aria-pressed={pattern.id === state.selectedId}
                         aria-label={`Select ${pattern.name}, stored pattern ${index + 1}`}
-                        onClick={() =>
-                          dispatch({ type: "select", id: pattern.id })
-                        }
+                        onClick={() => selectPattern(pattern.id)}
                         className="group flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 p-3 text-left hover:bg-slate-50 aria-pressed:border-blue-600 aria-pressed:bg-blue-50"
                       >
                         <PatternThumbnail cells={pattern.cells} />
@@ -147,14 +296,14 @@ function App() {
                             {pattern.name}
                           </strong>
                           <span className="mt-1 block text-xs text-slate-500">
-                            Pattern {String(index + 1).padStart(2, "0")}
+                            Pattern {String(index + 1).padStart(2, '0')}
                           </span>
                         </span>
                         <span
                           className="shrink-0 text-blue-700"
                           aria-hidden="true"
                         >
-                          {pattern.id === state.selectedId ? "✓" : "○"}
+                          {pattern.id === state.selectedId ? '✓' : '○'}
                         </span>
                       </button>
                     ))}
@@ -167,15 +316,59 @@ function App() {
             </section>
 
             <section className={panel} aria-labelledby="comparison-heading">
+              <h2 id="comparison-heading" className={heading}>
+                Recall experiment
+              </h2>
               {selected && state.cue ? (
                 <>
-                  <p className="mt-1 mb-6 text-sm text-slate-500 wrap-anywhere">
-                    Recall target:{" "}
+                  <p className="mt-1 text-sm text-slate-500 wrap-anywhere">
+                    Recall target:{' '}
                     <strong className="font-medium text-slate-700">
                       {selected.name}
                     </strong>
                   </p>
-                  <div className="grid gap-7 sm:grid-cols-2 sm:gap-6">
+                  <div className="my-6 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <div>
+                      <div className="flex items-center justify-between gap-4">
+                        <label
+                          htmlFor="noise-percentage"
+                          className="text-sm font-medium text-slate-700"
+                        >
+                          Cue damage
+                        </label>
+                        <output
+                          htmlFor="noise-percentage"
+                          className="text-sm font-semibold tabular-nums text-slate-900"
+                        >
+                          {noisePercentage}%
+                        </output>
+                      </div>
+                      <input
+                        id="noise-percentage"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={noisePercentage}
+                        onChange={(event) =>
+                          applyNoise(Number(event.target.value))
+                        }
+                        className="mt-3 h-2 w-full cursor-pointer accent-blue-600"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Reproducibly flips pixels in a fresh copy of the
+                        original.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={runRecall}
+                      className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700"
+                    >
+                      Recall
+                    </button>
+                  </div>
+                  <div className="grid gap-7 md:grid-cols-3 md:gap-5">
                     <div className="mx-auto w-full max-w-sm">
                       <div className="mb-3">
                         <h3 className="text-sm font-semibold">Original</h3>
@@ -191,7 +384,7 @@ function App() {
                     </div>
                     <div className="mx-auto w-full max-w-sm">
                       <div className="mb-3">
-                        <h3 className="text-sm font-semibold">Cue</h3>
+                        <h3 className="text-sm font-semibold">Damaged cue</h3>
                         <p className="mt-1 text-xs text-slate-500">
                           Editable copy
                         </p>
@@ -199,11 +392,132 @@ function App() {
                       <PatternGrid
                         label="Cue"
                         cells={state.cue}
-                        onChange={(cells) => dispatch({ type: "cue", cells })}
-                        onReset={() => dispatch({ type: "restore-cue" })}
-                        resetLabel="Restore cue"
+                        onChange={(cells) => {
+                          dispatch({ type: 'cue', cells });
+                          setNoisePercentage(
+                            Math.round(
+                              (cells.filter(
+                                (cell, index) => cell !== selected.cells[index]
+                              ).length /
+                                cells.length) *
+                                100
+                            )
+                          );
+                          clearPlayback();
+                        }}
+                        onReset={resetExperiment}
+                        resetLabel="Reset"
                       />
                     </div>
+                    <div className="mx-auto w-full max-w-sm">
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold">
+                          Recalled output
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {displayedRecall
+                            ? frameIndex === 0
+                              ? 'Recorded input cue'
+                              : `Recorded sweep ${frameIndex} of ${finalFrameIndex}`
+                            : 'Run recall to calculate'}
+                        </p>
+                      </div>
+                      <PatternGrid
+                        label={
+                          displayedRecall
+                            ? frameIndex === 0
+                              ? 'Recall input cue'
+                              : `Recalled output at sweep ${frameIndex}`
+                            : 'Recalled output, not run'
+                        }
+                        cells={displayedRecall ?? blankPattern()}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-7 border-t border-slate-100 pt-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={trace.length === 0 || isPlaying}
+                        onClick={() => {
+                          if (frameIndex >= finalFrameIndex) setFrameIndex(0);
+                          setIsPlaying(true);
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Play
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!isPlaying}
+                        onClick={() => setIsPlaying(false)}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Pause
+                      </button>
+                      <button
+                        type="button"
+                        disabled={trace.length === 0 || frameIndex === 0}
+                        onClick={() => {
+                          setIsPlaying(false);
+                          setFrameIndex((index) => Math.max(0, index - 1));
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Previous sweep
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          trace.length === 0 || frameIndex >= finalFrameIndex
+                        }
+                        onClick={() => {
+                          setIsPlaying(false);
+                          setFrameIndex((index) =>
+                            Math.min(finalFrameIndex, index + 1)
+                          );
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Next sweep
+                      </button>
+                      <button
+                        type="button"
+                        disabled={trace.length === 0}
+                        onClick={() => {
+                          setFrameIndex(0);
+                          setIsPlaying(trace.length > 1);
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Restart playback
+                      </button>
+                      <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
+                        Speed
+                        <select
+                          value={playbackSpeed}
+                          onChange={(event) =>
+                            setPlaybackSpeed(Number(event.target.value))
+                          }
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-800 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+                        >
+                          <option value={0.5}>0.5×</option>
+                          <option value={1}>1×</option>
+                          <option value={2}>2×</option>
+                        </select>
+                      </label>
+                    </div>
+                    <p
+                      className="mt-3 text-xs text-slate-500"
+                      aria-live="polite"
+                    >
+                      {trace.length === 0
+                        ? 'Run recall to record the computed sweep states.'
+                        : frameIndex === 0
+                          ? `Input cue · ${finalFrameIndex} recorded ${finalFrameIndex === 1 ? 'sweep' : 'sweeps'}`
+                          : `Sweep ${frameIndex} of ${finalFrameIndex}${frameIndex === finalFrameIndex ? ' · final state' : ''}`}
+                    </p>
                   </div>
                 </>
               ) : (
@@ -218,6 +532,8 @@ function App() {
                 </div>
               )}
             </section>
+
+            <WeightMatrixPreview weights={weights} />
           </div>
         </div>
 
