@@ -41,7 +41,7 @@ export function BarChart({
       className="flex flex-col gap-2.5"
     >
       {data.map((datum) => {
-        const width = max > 0 ? Math.max(2, (datum.value / max) * 100) : 0;
+        const width = max > 0 ? Math.min(100, Math.max(0, (datum.value / max) * 100)) : 0;
 
         return (
           <div key={datum.label} className="flex items-center gap-3">

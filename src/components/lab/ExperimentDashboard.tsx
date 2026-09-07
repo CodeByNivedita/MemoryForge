@@ -8,7 +8,7 @@ import {
 import { generateRandomPattern, generateNoisyCopy } from "../../experiments";
 import type { LabScenario, StoredPattern } from "../lab/patterns";
 import { BarChart } from "./charts/barchart";
-import { downloadJson } from "../../../utils/download/download";;
+import { downloadJson } from "../../../utils/download/download";
 
 
 const panel = "rounded-xl border border-slate-200 bg-white p-5 sm:p-6";
@@ -288,6 +288,7 @@ export function ExperimentDashboard({
           </p>
 
           <BarChart
+            maxValue={1}
             ariaLabel="Exact recall rate by noise percent"
             data={data.noiseBuckets.map((b) => ({
               label: `${b.key}%`,
@@ -306,6 +307,7 @@ export function ExperimentDashboard({
           </p>
 
           <BarChart
+            maxValue={1}
             ariaLabel="Exact recall rate by pattern count"
             data={data.loadBuckets.map((b) => ({
               label: `${b.key}`,
