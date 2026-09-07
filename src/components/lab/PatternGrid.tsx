@@ -88,7 +88,7 @@ export function PatternGrid(props: PatternGridProps) {
                 {cells.slice(row * 8, row * 8 + 8).map((cell, column) => (
                   <span
                     key={column}
-                    className={`block size-full min-h-0 min-w-0 rounded-[3px] border p-0 ${cell === 1 ? "border-slate-800 bg-slate-800" : "border-slate-300 bg-slate-100"}`}
+                    className={`block size-full min-h-0 min-w-0 rounded-[3px] border p-0 ${cell === 1 ? "border-blue-700 bg-blue-600" : "border-slate-300 bg-white"}`}
                   />
                 ))}
               </div>
@@ -122,7 +122,7 @@ export function PatternGrid(props: PatternGridProps) {
                         ref={(element) => {
                           buttons.current[index] = element;
                         }}
-                        className={`block size-full min-h-0 min-w-0 rounded-[3px] border p-0 cursor-pointer hover:border-blue-600 hover:ring-1 hover:ring-blue-600 focus-visible:relative focus-visible:z-10 focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-blue-600 focus-visible:outline-offset-1! ${cell === 1 ? "border-slate-800 bg-slate-800" : "border-slate-300 bg-slate-100"}`}
+                        className={`block size-full min-h-0 min-w-0 rounded-[3px] border p-0 cursor-pointer hover:border-blue-600 hover:ring-1 hover:ring-blue-600 focus-visible:relative focus-visible:z-10 focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-blue-600 focus-visible:outline-offset-1! ${cell === 1 ? "border-blue-700 bg-blue-600" : "border-slate-300 bg-white"}`}
                         aria-label={`Row ${row + 1}, column ${column + 1}`}
                         aria-pressed={cell === 1}
                         tabIndex={index === focusIndex ? 0 : -1}
@@ -176,7 +176,7 @@ export function PatternThumbnail({ cells }: { cells: PatternCells }) {
       {cells.map((cell, i) => (
         <span
           key={i}
-          className={`block rounded-[1px] ${cell === 1 ? "bg-slate-700 group-aria-pressed:bg-blue-700" : "bg-slate-100"}`}
+          className={`block rounded-[1px] ${cell === 1 ? "bg-blue-600 group-aria-pressed:bg-blue-700" : "bg-slate-100"}`}
         />
       ))}
     </span>

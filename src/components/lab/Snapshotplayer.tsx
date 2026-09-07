@@ -18,15 +18,6 @@ function accuracyAt(frame: PatternCells, target: PatternCells): number {
   return matches / frame.length;
 }
 
-/**
- * Steps through the sweep-by-sweep states the Hopfield engine produced
- * while recalling, so the settling process (or failure to settle
- * correctly) is visible rather than just the final state.
- *
- * Mount a fresh instance per recall (e.g. `key={state.recallVersion}` from
- * the caller) so frame/playback state resets naturally instead of being
- * synchronized via an effect.
- */
 export function SnapshotPlayer({ snapshots, initialCue, target }: SnapshotPlayerProps) {
   const frames = [initialCue, ...snapshots];
   const lastIndex = frames.length - 1;

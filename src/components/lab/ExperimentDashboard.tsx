@@ -1,18 +1,17 @@
-import { useMemo } from "react";
+import { useMemo } from 'react';
 import {
   runControlledExperiments,
   calculateAggregateStats,
   buildExperimentOutput,
   type RecallRun,
-} from "../../experiments/run-evaluation";
-import { generateRandomPattern, generateNoisyCopy } from "../../experiments";
-import type { LabScenario, StoredPattern } from "../lab/patterns";
-import { BarChart } from "./charts/barchart";
-import { downloadJson } from "../../../utils/download/download";
+} from '../../experiments/run-evaluation';
+import { generateRandomPattern, generateNoisyCopy } from '../../experiments';
+import type { LabScenario, StoredPattern } from '../lab/patterns';
+import { BarChart } from './charts/barchart';
+import { downloadJson } from '../../../utils/download/download';
 
-
-const panel = "rounded-xl border border-slate-200 bg-white p-5 sm:p-6";
-const heading = "text-base font-semibold tracking-tight text-slate-900";
+const panel = 'surface-panel p-5 sm:p-6';
+const heading = 'text-base font-semibold tracking-tight text-slate-900';
 
 interface Bucket {
   readonly key: number;
@@ -25,7 +24,7 @@ interface Bucket {
 
 function bucketStats(
   runs: readonly RecallRun[],
-  key: "noisePercent" | "patternCount",
+  key: 'noisePercent' | 'patternCount'
 ): Bucket[] {
   const groups = new Map<number, RecallRun[]>();
 
@@ -58,13 +57,13 @@ function bucketStats(
 
 function mostReliable(buckets: readonly Bucket[]): Bucket {
   return [...buckets].sort(
-    (a, b) => b.exactRecallRate - a.exactRecallRate || b.key - a.key,
+    (a, b) => b.exactRecallRate - a.exactRecallRate || b.key - a.key
   )[0];
 }
 
 function leastReliable(buckets: readonly Bucket[]): Bucket {
   return [...buckets].sort(
-    (a, b) => a.exactRecallRate - b.exactRecallRate || a.key - b.key,
+    (a, b) => a.exactRecallRate - b.exactRecallRate || a.key - b.key
   )[0];
 }
 
@@ -82,39 +81,43 @@ function createStoredPatterns(seed: number, count: number): StoredPattern[] {
 function representativeRun(
   runs: readonly RecallRun[],
   noisePercent: number,
-  exactRecall: boolean,
+  exactRecall: boolean
 ): RecallRun {
-  const candidates = runs.filter((r) => r.noisePercent === noisePercent && r.metrics.exactRecall === exactRecall);
+  const candidates = runs.filter(
+    (r) =>
+      r.noisePercent === noisePercent && r.metrics.exactRecall === exactRecall
+  );
   return [...candidates].sort(
-    (a, b) => a.seed - b.seed || a.targetPatternId.localeCompare(b.targetPatternId),
+    (a, b) =>
+      a.seed - b.seed || a.targetPatternId.localeCompare(b.targetPatternId)
   )[0];
 }
 
 interface PresetCardProps {
-  readonly kind: "success" | "failure";
+  readonly kind: 'success' | 'failure';
   readonly bucket: Bucket;
   readonly run: RecallRun;
   readonly onLoad: () => void;
 }
 
 function PresetCard({ kind, bucket, run, onLoad }: PresetCardProps) {
-  const isSuccess = kind === "success";
+  const isSuccess = kind === 'success';
 
   return (
     <div
-      className={`rounded-lg border p-4 ${isSuccess ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}
+      className={`rounded-lg border p-4 ${isSuccess ? 'border-emerald-200 bg-white' : 'border-rose-200 bg-white'}`}
     >
       <p
-        className={`text-xs font-semibold uppercase tracking-wide ${isSuccess ? "text-emerald-700" : "text-rose-700"}`}
+        className={`text-xs font-semibold uppercase tracking-wide ${isSuccess ? 'text-emerald-700' : 'text-rose-700'}`}
       >
-        {isSuccess ? "Measured success preset" : "Measured failure preset"}
+        {isSuccess ? 'Measured success preset' : 'Measured failure preset'}
       </p>
 
       <p className="mt-2 text-sm leading-6 text-slate-700">
-        {run.patternCount} stored patterns, {run.noisePercent}% noise on the
-        cue — <strong>{(bucket.exactRecallRate * 100).toFixed(0)}%</strong>{" "}
-        exact recall across every sampled seed and target at this
-        configuration ({bucket.exactRecalls}/{bucket.n}).
+        {run.patternCount} stored patterns, {run.noisePercent}% noise on the cue
+        — <strong>{(bucket.exactRecallRate * 100).toFixed(0)}%</strong> exact
+        recall across every sampled seed and target at this configuration (
+        {bucket.exactRecalls}/{bucket.n}).
       </p>
 
       <p className="mt-2 text-xs text-slate-500">
@@ -124,7 +127,7 @@ function PresetCard({ kind, bucket, run, onLoad }: PresetCardProps) {
       <button
         type="button"
         onClick={onLoad}
-        className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-medium text-white ${isSuccess ? "bg-emerald-700 hover:bg-emerald-800" : "bg-rose-700 hover:bg-rose-800"}`}
+        className={`mt-3 w-full rounded-lg px-3 py-2 text-sm font-medium text-white ${isSuccess ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-rose-700 hover:bg-rose-800'}`}
       >
         Load into Pattern Lab
       </button>
@@ -146,8 +149,8 @@ export function ExperimentDashboard({
     return {
       results,
       all,
-      noiseBuckets: bucketStats(results.noise, "noisePercent"),
-      loadBuckets: bucketStats(results.memoryLoad, "patternCount"),
+      noiseBuckets: bucketStats(results.noise, 'noisePercent'),
+      loadBuckets: bucketStats(results.memoryLoad, 'patternCount'),
       aggregate: {
         noise: calculateAggregateStats(results.noise),
         memoryLoad: calculateAggregateStats(results.memoryLoad),
@@ -158,13 +161,22 @@ export function ExperimentDashboard({
 
   const successBucket = mostReliable(data.noiseBuckets);
   const failureBucket = leastReliable(data.noiseBuckets);
-  const successRun = representativeRun(data.results.noise, successBucket.key, true);
-  const failureRun = representativeRun(data.results.noise, failureBucket.key, false);
+  const successRun = representativeRun(
+    data.results.noise,
+    successBucket.key,
+    true
+  );
+  const failureRun = representativeRun(
+    data.results.noise,
+    failureBucket.key,
+    false
+  );
 
   function loadPreset(run: RecallRun) {
     const stored = createStoredPatterns(run.seed, run.patternCount);
     const target = stored.find((pattern) => pattern.id === run.targetPatternId);
-    if (!target) throw new Error("Experiment target is missing from its memory bank.");
+    if (!target)
+      throw new Error('Experiment target is missing from its memory bank.');
 
     const cue =
       run.noisePercent > 0
@@ -180,18 +192,22 @@ export function ExperimentDashboard({
       noiseSeed: run.seed + 1000,
       maxSweeps: run.metrics.maxSweeps,
       label: `${run.patternCount}-pattern / ${run.noisePercent}% noise ${
-        run.metrics.exactRecall ? "success" : "failure"
+        run.metrics.exactRecall ? 'success' : 'failure'
       } preset (seed ${run.seed})`,
     });
   }
 
   function exportResults() {
-    downloadJson("memoryforge-experiment-results.json", {
+    downloadJson('memoryforge-experiment-results.json', {
       generatedAt: new Date().toISOString(),
       configuration: buildExperimentOutput(data.results).configuration,
-      seeding: { pattern: "seed + pattern index", noise: "seed + 1000", recall: "seed + 2000" },
+      seeding: {
+        pattern: 'seed + pattern index',
+        noise: 'seed + 1000',
+        recall: 'seed + 2000',
+      },
       description:
-        "Controlled experiments on the MemoryForge Hopfield-style associative memory: patterns fixed with increasing noise, and generation method fixed with increasing memory load.",
+        'Controlled experiments on the MemoryForge Hopfield-style associative memory: patterns fixed with increasing noise, and generation method fixed with increasing memory load.',
       sampleCounts: {
         noise: data.results.noise.length,
         memoryLoad: data.results.memoryLoad.length,
@@ -220,25 +236,26 @@ export function ExperimentDashboard({
           </h2>
 
           <span className="text-sm tabular-nums text-slate-500">
-            {data.all.length} runs · {data.aggregate.overall.exactRecalls}{" "}
-            exact recalls ({(data.aggregate.overall.exactRecallRate * 100).toFixed(1)}%)
+            {data.all.length} runs · {data.aggregate.overall.exactRecalls} exact
+            recalls ({(data.aggregate.overall.exactRecallRate * 100).toFixed(1)}
+            %)
           </span>
         </div>
 
         <p className="text-sm leading-6 text-slate-600">
           Two controlled experiments run live in your browser, using the
-          project's real Hebbian learning rule and asynchronous Hopfield
-          recall — the same engine as the Pattern Lab. Five seeds
-          (11, 22, 33, 44, 55), all four targets per seed in the noise experiment,
-          and up to four targets per load in the memory-load experiment. Each
-          run allows at most 50 sweeps.
+          project's real Hebbian learning rule and asynchronous Hopfield recall
+          — the same engine as the Pattern Lab. Five seeds (11, 22, 33, 44, 55),
+          all four targets per seed in the noise experiment, and up to four
+          targets per load in the memory-load experiment. Each run allows at
+          most 50 sweeps.
         </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div className="rounded-lg bg-slate-50 p-4">
             <p className="text-xs text-slate-500">Noise experiment</p>
             <p className="mt-1 text-lg font-semibold">
-              {data.aggregate.noise.exactRecallRate * 100 | 0}% exact
+              {(data.aggregate.noise.exactRecallRate * 100) | 0}% exact
             </p>
             <p className="mt-1 text-xs text-slate-500">
               {data.aggregate.noise.totalRuns} runs, patterns fixed
@@ -248,7 +265,7 @@ export function ExperimentDashboard({
           <div className="rounded-lg bg-slate-50 p-4">
             <p className="text-xs text-slate-500">Memory-load experiment</p>
             <p className="mt-1 text-lg font-semibold">
-              {data.aggregate.memoryLoad.exactRecallRate * 100 | 0}% exact
+              {(data.aggregate.memoryLoad.exactRecallRate * 100) | 0}% exact
             </p>
             <p className="mt-1 text-xs text-slate-500">
               {data.aggregate.memoryLoad.totalRuns} runs, generator fixed
@@ -271,7 +288,7 @@ export function ExperimentDashboard({
         <button
           type="button"
           onClick={exportResults}
-          className="mt-5 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="button-secondary mt-5"
         >
           Export full results (JSON)
         </button>
@@ -320,13 +337,17 @@ export function ExperimentDashboard({
 
       {/* SELECTED EXAMPLES */}
       <section className={panel} aria-labelledby="selected-examples-heading">
-        <h3 id="selected-examples-heading" className="mb-1 text-sm font-semibold">
+        <h3
+          id="selected-examples-heading"
+          className="mb-1 text-sm font-semibold"
+        >
           Selected examples for the guided demo
         </h3>
         <p className="mb-4 text-xs text-slate-500">
           Measured examples from the strongest and weakest noise configurations.
           Rates describe these sampled runs, not a guarantee for new patterns.
-          Loading a preset replaces the lab memory bank and preserves its recall settings.
+          Loading a preset replaces the lab memory bank and preserves its recall
+          settings.
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">

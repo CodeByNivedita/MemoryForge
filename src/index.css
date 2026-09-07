@@ -1,1 +1,93 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+@theme {
+  /* Summer Ocean Breeze: exact reference colors plus tonal steps for UI states. */
+  --color-coral: #E63946;
+  --color-slate-50: #F1FAEE;
+  --color-slate-100: #E7F1ED;
+  --color-slate-200: #D1E2E2;
+  --color-slate-300: #ADC6CE;
+  --color-slate-400: #758F9F;
+  --color-slate-500: #587487;
+  --color-slate-600: #456276;
+  --color-slate-700: #34516B;
+  --color-slate-800: #284563;
+  --color-slate-900: #1D3557;
+  --color-slate-950: #1D3557;
+  --color-blue-50: #EDF7F6;
+  --color-blue-100: #D5EEEE;
+  --color-blue-200: #A8DADC;
+  --color-blue-300: #86C0CB;
+  --color-blue-400: #649DAF;
+  --color-blue-500: #528CA6;
+  --color-blue-600: #457B9D;
+  --color-blue-700: #356481;
+  --color-blue-800: #294E6C;
+  --color-blue-900: #1D3557;
+  --font-sans: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    margin: 0;
+    min-width: 0;
+  }
+  button,
+  input,
+  select,
+  summary,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  ::selection {
+    background: #A8DADC;
+    color: #1D3557;
+  }
+  :focus-visible {
+    outline: 2px solid #1D3557;
+    outline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Shared Tailwind primitives keep hierarchy and interaction states consistent. */
+@utility surface-panel {
+  @apply rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_10px_-6px_#16223a18];
+}
+@utility page-title {
+  @apply text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-950 sm:text-4xl;
+}
+@utility section-title {
+  @apply text-base font-semibold tracking-[-0.015em] text-slate-900;
+}
+@utility eyebrow {
+  @apply text-xs font-medium uppercase tracking-[0.16em] text-slate-400;
+}
+@utility button-primary {
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-blue-700/10 bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-xs transition-[background-color,box-shadow,transform] duration-150 hover:bg-blue-700 active:translate-y-px disabled:pointer-events-none disabled:opacity-40 motion-reduce:transition-none;
+}
+@utility button-secondary {
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white/80 px-4 py-2.5 text-sm font-medium text-slate-600 shadow-xs transition-colors hover:border-slate-300 hover:bg-white disabled:pointer-events-none disabled:opacity-40 motion-reduce:transition-none;
+}
+@utility segment-button {
+  @apply inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-slate-500 transition-colors aria-pressed:bg-white aria-pressed:text-slate-900 aria-pressed:shadow-sm disabled:opacity-35 hover:text-slate-800 motion-reduce:transition-none;
+}
+@utility field-input {
+  @apply min-h-10 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:bg-white;
+}
