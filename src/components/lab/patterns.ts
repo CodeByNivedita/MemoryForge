@@ -1,4 +1,5 @@
 import type { RecallMetrics } from "../../experiments";
+import { generateNoisyCopy } from "../../experiments";
 
 export const GRID_SIZE = 8;
 export const CELL_COUNT = GRID_SIZE * GRID_SIZE;
@@ -113,6 +114,14 @@ export interface LabState {
   // Hopfield recall result
   readonly recalled: PatternCells | null;
   readonly recallMetrics: RecallMetrics | null;
+  readonly snapshots: readonly PatternCells[] | null;
+  // Incremented on every recall so the snapshot player can key off it and
+  // reset its own frame/playback state without syncing via an effect.
+  readonly recallVersion: number;
+
+  // Set when the current stored patterns / cue came from a
+  // dashboard-selected success/failure preset (for labelling in the UI).
+  readonly scenarioLabel: string | null;
 
   readonly nextNumber: number;
   readonly announcement: string;
@@ -128,6 +137,10 @@ export function createLabState(): LabState {
 
     recalled: null,
     recallMetrics: null,
+    snapshots: null,
+    recallVersion: 0,
+
+    scenarioLabel: null,
 
     nextNumber: 1,
     announcement: "",
@@ -142,10 +155,19 @@ export type LabAction =
   | { type: "select"; id: string }
   | { type: "cue"; cells: PatternCells }
   | { type: "restore-cue" }
+  | { type: "add-noise"; percent: number }
   | {
       type: "recall-result";
       recalled: PatternCells;
       recallMetrics: RecallMetrics;
+      snapshots: readonly PatternCells[];
+    }
+  | {
+      type: "load-scenario";
+      stored: readonly StoredPattern[];
+      selectedId: string;
+      cue: PatternCells;
+      label: string;
     };
 
 export function labReducer(state: LabState, action: LabAction): LabState {
@@ -173,6 +195,8 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       ...state,
       recalled: [...action.recalled],
       recallMetrics: action.recallMetrics,
+      snapshots: action.snapshots.map((frame) => [...frame]),
+      recallVersion: state.recallVersion + 1,
       announcement: "Recall completed.",
       };
     case "store": {
@@ -188,6 +212,7 @@ export function labReducer(state: LabState, action: LabAction): LabState {
         cue: [...pattern.cells],
         nextNumber: state.nextNumber + 1,
         name: `Pattern ${state.nextNumber + 1}`,
+        scenarioLabel: null,
         announcement: `${pattern.name} stored and selected. A separate cue is ready to edit.`,
       };
     }
@@ -200,6 +225,7 @@ export function labReducer(state: LabState, action: LabAction): LabState {
             cue: [...pattern.cells],
             recalled: null,
             recallMetrics: null,
+            snapshots: null,
             announcement: `${pattern.name} selected. Cue restored from its original.`,
           }
         : state;
@@ -213,6 +239,7 @@ export function labReducer(state: LabState, action: LabAction): LabState {
     cue: [...action.cells],
     recalled: null,
     recallMetrics: null,
+    snapshots: null,
   };
     case "restore-cue": {
       const pattern = state.stored.find((item) => item.id === state.selectedId);
@@ -223,8 +250,40 @@ export function labReducer(state: LabState, action: LabAction): LabState {
             announcement: `Cue restored from ${pattern.name}.`,
             recalled: null,
             recallMetrics: null,
+            snapshots: null,
           }
         : state;
+    }
+    case "add-noise": {
+      if (!state.selectedId || !state.cue) return state;
+
+      const seed = Math.floor(Math.random() * 1_000_000);
+      const noisy = generateNoisyCopy(state.cue, action.percent, seed);
+
+      return {
+        ...state,
+        cue: [...noisy.cells],
+        recalled: null,
+        recallMetrics: null,
+        snapshots: null,
+        announcement: `Flipped ${noisy.flippedPixels} cell${noisy.flippedPixels === 1 ? "" : "s"} (${action.percent}% noise) in the cue.`,
+      };
+    }
+    case "load-scenario": {
+      // Loading a preset scenario replaces the whole memory bank so the
+      // Pattern Lab exactly matches the dashboard configuration (same
+      // stored patterns, same target, same noisy cue).
+      return {
+        ...state,
+        stored: action.stored.map((pattern) => ({ ...pattern })),
+        selectedId: action.selectedId,
+        cue: [...action.cue],
+        recalled: null,
+        recallMetrics: null,
+        snapshots: null,
+        scenarioLabel: action.label,
+        announcement: `${action.label} loaded into the Pattern Lab.`,
+      };
     }
   }
 }

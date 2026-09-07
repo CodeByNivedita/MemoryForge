@@ -7,7 +7,8 @@ import {
 import { generateRandomPattern, generateNoisyCopy } from "../../experiments";
 import type { PatternCells, StoredPattern } from "../lab/patterns";
 import { BarChart } from "./charts/barchart";
-import { downloadJson } from "../../../utils/download/download";
+import { downloadJson } from "../../../utils/download/download";;
+
 
 const panel = "rounded-xl border border-slate-200 bg-white p-5 sm:p-6";
 const heading = "text-base font-semibold tracking-tight text-slate-900";
