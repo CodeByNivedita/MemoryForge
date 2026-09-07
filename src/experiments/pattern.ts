@@ -152,79 +152,21 @@ export function generateRandomPattern(seed: number): ExperimentPattern {
   });
 }
 
-export function generateRandomPatterns(seed: number, count: number): readonly ExperimentPattern[] {
-  return Object.freeze(Array.from({ length: count }, (_, i) => generateRandomPattern(seed + i)));
-}
-
-export const RANDOM_PATTERNS: readonly ExperimentPattern[] = generateRandomPatterns(1, 8);
-/**
- * Generate a collection of reproducible random patterns.
- */
+/** Supports an explicit seed list and the existing consecutive-seed API. */
+export function generateRandomPatterns(seeds: readonly number[]): readonly ExperimentPattern[];
+export function generateRandomPatterns(seed: number, count: number): readonly ExperimentPattern[];
 export function generateRandomPatterns(
-  seeds: readonly number[],
+  seedOrSeeds: number | readonly number[],
+  count?: number,
 ): readonly ExperimentPattern[] {
-  return Object.freeze(seeds.map(generateRandomPattern));
+  if (typeof seedOrSeeds !== "number") {
+    return Object.freeze(seedOrSeeds.map(generateRandomPattern));
+  }
+  if (!Number.isSafeInteger(count) || count! < 0) {
+    throw new RangeError("Pattern count must be a non-negative integer.");
+  }
+  return Object.freeze(Array.from({ length: count! }, (_, i) => generateRandomPattern(seedOrSeeds + i)));
 }
 
-/**
- * Fixed random patterns used by the experiment suite.
- */
-export const RANDOM_PATTERNS = generateRandomPatterns([
-  11,
-  22,
-  33,
-  44,
-]);
-/**
- * Create a deterministic noisy copy of a pattern.
- *
- * noisePercent = percentage of cells to flip.
- * The same seed always produces the same noisy cue.
- */
-export function generateNoisyCopy(
-  cells: PatternCells,
-  noisePercent: number,
-  seed: number,
-): PatternCells {
-  if (cells.length !== CELL_COUNT) {
-    throw new RangeError(
-      `Pattern must contain exactly ${CELL_COUNT} cells.`,
-    );
-  }
-
-  if (noisePercent < 0 || noisePercent > 100) {
-    throw new RangeError(
-      "noisePercent must be between 0 and 100.",
-    );
-  }
-
-  const result: Cell[] = [...cells];
-  const random = seededRandom(seed);
-
-  const flipCount = Math.round(
-    (CELL_COUNT * noisePercent) / 100,
-  );
-
-  const indices = Array.from(
-    { length: CELL_COUNT },
-    (_, index) => index,
-  );
-
-  // Deterministic shuffle.
-  for (let i = indices.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(random() * (i + 1));
-
-    [indices[i], indices[j]] = [
-      indices[j],
-      indices[i],
-    ];
-  }
-
-  // Flip exactly the requested number of cells.
-  for (let i = 0; i < flipCount; i += 1) {
-    const index = indices[i];
-    result[index] = result[index] === 1 ? -1 : 1;
-  }
-
-  return Object.freeze(result);
-}
+/** Nivedita's fixed example group; controlled experiments choose their own seeds. */
+export const RANDOM_PATTERNS = generateRandomPatterns([11, 22, 33, 44]);
