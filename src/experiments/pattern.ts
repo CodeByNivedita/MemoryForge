@@ -1,3 +1,6 @@
+import { generateNoisyCopy } from "./noise";
+
+export { generateNoisyCopy };
 export const GRID_SIZE = 8;
 export const CELL_COUNT = GRID_SIZE * GRID_SIZE;
 
@@ -98,11 +101,7 @@ export const VISUAL_PATTERNS: readonly ExperimentPattern[] =
     ]),
   ]);
 
-/**
- * Small deterministic pseudo-random number generator.
- *
- * Same seed always produces the same sequence.
- */
+
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
 
@@ -153,6 +152,11 @@ export function generateRandomPattern(seed: number): ExperimentPattern {
   });
 }
 
+export function generateRandomPatterns(seed: number, count: number): readonly ExperimentPattern[] {
+  return Object.freeze(Array.from({ length: count }, (_, i) => generateRandomPattern(seed + i)));
+}
+
+export const RANDOM_PATTERNS: readonly ExperimentPattern[] = generateRandomPatterns(1, 8);
 /**
  * Generate a collection of reproducible random patterns.
  */
@@ -171,3 +175,56 @@ export const RANDOM_PATTERNS = generateRandomPatterns([
   33,
   44,
 ]);
+/**
+ * Create a deterministic noisy copy of a pattern.
+ *
+ * noisePercent = percentage of cells to flip.
+ * The same seed always produces the same noisy cue.
+ */
+export function generateNoisyCopy(
+  cells: PatternCells,
+  noisePercent: number,
+  seed: number,
+): PatternCells {
+  if (cells.length !== CELL_COUNT) {
+    throw new RangeError(
+      `Pattern must contain exactly ${CELL_COUNT} cells.`,
+    );
+  }
+
+  if (noisePercent < 0 || noisePercent > 100) {
+    throw new RangeError(
+      "noisePercent must be between 0 and 100.",
+    );
+  }
+
+  const result: Cell[] = [...cells];
+  const random = seededRandom(seed);
+
+  const flipCount = Math.round(
+    (CELL_COUNT * noisePercent) / 100,
+  );
+
+  const indices = Array.from(
+    { length: CELL_COUNT },
+    (_, index) => index,
+  );
+
+  // Deterministic shuffle.
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+
+    [indices[i], indices[j]] = [
+      indices[j],
+      indices[i],
+    ];
+  }
+
+  // Flip exactly the requested number of cells.
+  for (let i = 0; i < flipCount; i += 1) {
+    const index = indices[i];
+    result[index] = result[index] === 1 ? -1 : 1;
+  }
+
+  return Object.freeze(result);
+}

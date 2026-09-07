@@ -9,6 +9,9 @@ export {
   type PatternCells,
   type ExperimentPattern,
 } from "./pattern";
+export * from "./evaluation";
+export * from "./pattern";
+export * from "./noise";
 
 export {
   generateNoisyCopy,
