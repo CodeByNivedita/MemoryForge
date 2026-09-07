@@ -8,7 +8,7 @@ import {
   labReducer,
   PRESETS,
 } from "./components/lab/patterns";
-import type { PatternCells, StoredPattern } from "./components/lab/patterns";
+import type { LabScenario } from "./components/lab/patterns";
 import { SnapshotPlayer } from "./components/lab/Snapshotplayer.tsx";
 import { FailureAnalysis } from "./components/lab/FailureAnalysis";
 import { ExperimentDashboard } from "./components/lab/ExperimentDashboard";
@@ -65,7 +65,8 @@ function App() {
     const result = recall(
       weights,
       [...state.cue],
-      42,
+      state.recallSeed,
+      { maxSweeps: state.maxSweeps },
     );
 
     const recallTimeMs =
@@ -77,7 +78,7 @@ function App() {
       selected,
       state.stored,
       result,
-      100,
+      state.maxSweeps,
       recallTimeMs,
     );
 
@@ -90,18 +91,10 @@ function App() {
     });
   };
 
-  function handleLoadScenario(scenario: {
-    stored: readonly StoredPattern[];
-    selectedId: string;
-    cue: PatternCells;
-    label: string;
-  }) {
+  function handleLoadScenario(scenario: LabScenario) {
     dispatch({
       type: "load-scenario",
-      stored: scenario.stored,
-      selectedId: scenario.selectedId,
-      cue: scenario.cue,
-      label: scenario.label,
+      ...scenario,
     });
     setTab("lab");
   }
@@ -112,6 +105,9 @@ function App() {
     downloadJson("memoryforge-session.json", {
       generatedAt: new Date().toISOString(),
       scenarioLabel: state.scenarioLabel,
+      recallSeed: state.recallSeed,
+      maxSweeps: state.maxSweeps,
+      noiseSeed: state.noiseSeed,
       storedPatterns: state.stored,
       target: selected,
       cue: state.cue,
@@ -444,6 +440,7 @@ function App() {
               className={panel}
               aria-labelledby="comparison-heading"
             >
+              <h2 id="comparison-heading" className={heading}>Recall experiment</h2>
 
               {selected && state.cue ? (
 
@@ -534,7 +531,7 @@ function App() {
                       {/* NOISE CONTROLS */}
                       <div className="mt-3">
                         <p className="mb-1.5 text-xs text-slate-500">
-                          Add noise to cue
+                          Replace cue with noise from the original (seed {state.noiseSeed})
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {NOISE_PRESETS.map((percent) => (
@@ -546,7 +543,7 @@ function App() {
                               }
                               className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50"
                             >
-                              +{percent}%
+                              {percent}%
                             </button>
                           ))}
                         </div>
@@ -573,6 +570,7 @@ function App() {
                         <SnapshotPlayer
                           key={state.recallVersion}
                           snapshots={state.snapshots}
+                          initialCue={state.cue}
                           target={selected.cells}
                         />
 
@@ -619,7 +617,7 @@ function App() {
                       <div className="rounded-lg bg-slate-50 p-4">
 
                         <p className="text-xs text-slate-500">
-                          Exact recall
+                          Final exact recall
                         </p>
 
                         <p className="mt-1 text-lg font-semibold">

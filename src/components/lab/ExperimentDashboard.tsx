@@ -2,10 +2,11 @@ import { useMemo } from "react";
 import {
   runControlledExperiments,
   calculateAggregateStats,
+  buildExperimentOutput,
   type RecallRun,
 } from "../../experiments/run-evaluation";
 import { generateRandomPattern, generateNoisyCopy } from "../../experiments";
-import type { PatternCells, StoredPattern } from "../lab/patterns";
+import type { LabScenario, StoredPattern } from "../lab/patterns";
 import { BarChart } from "./charts/barchart";
 import { downloadJson } from "../../../utils/download/download";
 
@@ -76,16 +77,13 @@ function createStoredPatterns(seed: number, count: number): StoredPattern[] {
   return patterns;
 }
 
-function targetIndexOf(run: RecallRun): number {
-  return Number(run.targetPatternId.split("-")[1]) - run.seed;
-}
-
 /** Pick one representative, reproducible run from a noise-level bucket. */
 function representativeRun(
   runs: readonly RecallRun[],
   noisePercent: number,
+  exactRecall: boolean,
 ): RecallRun {
-  const candidates = runs.filter((r) => r.noisePercent === noisePercent);
+  const candidates = runs.filter((r) => r.noisePercent === noisePercent && r.metrics.exactRecall === exactRecall);
   return [...candidates].sort(
     (a, b) => a.seed - b.seed || a.targetPatternId.localeCompare(b.targetPatternId),
   )[0];
@@ -108,7 +106,7 @@ function PresetCard({ kind, bucket, run, onLoad }: PresetCardProps) {
       <p
         className={`text-xs font-semibold uppercase tracking-wide ${isSuccess ? "text-emerald-700" : "text-rose-700"}`}
       >
-        {isSuccess ? "Reliable success preset" : "Reliable failure preset"}
+        {isSuccess ? "Measured success preset" : "Measured failure preset"}
       </p>
 
       <p className="mt-2 text-sm leading-6 text-slate-700">
@@ -134,12 +132,7 @@ function PresetCard({ kind, bucket, run, onLoad }: PresetCardProps) {
 }
 
 interface ExperimentDashboardProps {
-  readonly onLoadScenario: (scenario: {
-    stored: readonly StoredPattern[];
-    selectedId: string;
-    cue: PatternCells;
-    label: string;
-  }) => void;
+  readonly onLoadScenario: (scenario: LabScenario) => void;
 }
 
 export function ExperimentDashboard({
@@ -164,13 +157,13 @@ export function ExperimentDashboard({
 
   const successBucket = mostReliable(data.noiseBuckets);
   const failureBucket = leastReliable(data.noiseBuckets);
-  const successRun = representativeRun(data.results.noise, successBucket.key);
-  const failureRun = representativeRun(data.results.noise, failureBucket.key);
+  const successRun = representativeRun(data.results.noise, successBucket.key, true);
+  const failureRun = representativeRun(data.results.noise, failureBucket.key, false);
 
   function loadPreset(run: RecallRun) {
     const stored = createStoredPatterns(run.seed, run.patternCount);
-    const targetIndex = targetIndexOf(run);
-    const target = stored[targetIndex];
+    const target = stored.find((pattern) => pattern.id === run.targetPatternId);
+    if (!target) throw new Error("Experiment target is missing from its memory bank.");
 
     const cue =
       run.noisePercent > 0
@@ -182,8 +175,11 @@ export function ExperimentDashboard({
       stored,
       selectedId: target.id,
       cue,
+      recallSeed: run.seed + 2000,
+      noiseSeed: run.seed + 1000,
+      maxSweeps: run.metrics.maxSweeps,
       label: `${run.patternCount}-pattern / ${run.noisePercent}% noise ${
-        run.noisePercent === successBucket.key ? "success" : "failure"
+        run.metrics.exactRecall ? "success" : "failure"
       } preset (seed ${run.seed})`,
     });
   }
@@ -191,6 +187,8 @@ export function ExperimentDashboard({
   function exportResults() {
     downloadJson("memoryforge-experiment-results.json", {
       generatedAt: new Date().toISOString(),
+      configuration: buildExperimentOutput(data.results).configuration,
+      seeding: { pattern: "seed + pattern index", noise: "seed + 1000", recall: "seed + 2000" },
       description:
         "Controlled experiments on the MemoryForge Hopfield-style associative memory: patterns fixed with increasing noise, and generation method fixed with increasing memory load.",
       sampleCounts: {
@@ -230,8 +228,9 @@ export function ExperimentDashboard({
           Two controlled experiments run live in your browser, using the
           project's real Hebbian learning rule and asynchronous Hopfield
           recall — the same engine as the Pattern Lab. Five seeds
-          (11, 22, 33, 44, 55) and every stored pattern as a recall target
-          were used for both.
+          (11, 22, 33, 44, 55), all four targets per seed in the noise experiment,
+          and up to four targets per load in the memory-load experiment. Each
+          run allows at most 50 sweeps.
         </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -322,8 +321,9 @@ export function ExperimentDashboard({
           Selected examples for the guided demo
         </h3>
         <p className="mb-4 text-xs text-slate-500">
-          Chosen because they're reliable across every seed at this
-          configuration, not a single lucky or unlucky run.
+          Measured examples from the strongest and weakest noise configurations.
+          Rates describe these sampled runs, not a guarantee for new patterns.
+          Loading a preset replaces the lab memory bank and preserves its recall settings.
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">

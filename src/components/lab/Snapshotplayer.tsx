@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { PatternGrid } from "./PatternGrid";
 import type { PatternCells } from "./patterns";
 
 interface SnapshotPlayerProps {
   readonly snapshots: readonly PatternCells[];
+  readonly initialCue: PatternCells;
   readonly target: PatternCells;
 }
 
@@ -26,43 +27,31 @@ function accuracyAt(frame: PatternCells, target: PatternCells): number {
  * the caller) so frame/playback state resets naturally instead of being
  * synchronized via an effect.
  */
-export function SnapshotPlayer({ snapshots, target }: SnapshotPlayerProps) {
-  const lastIndex = Math.max(0, snapshots.length - 1);
+export function SnapshotPlayer({ snapshots, initialCue, target }: SnapshotPlayerProps) {
+  const frames = [initialCue, ...snapshots];
+  const lastIndex = frames.length - 1;
   const [frame, setFrame] = useState(lastIndex);
   const [playing, setPlaying] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isPlaying = playing && frame < lastIndex;
 
   useEffect(() => {
-    if (!playing) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-
-    timerRef.current = setInterval(() => {
-      setFrame((current) => {
-        if (current >= lastIndex) {
-          setPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
+    if (!isPlaying) return;
+    const timer = setInterval(() => {
+      setFrame((current) => Math.min(current + 1, lastIndex));
     }, FRAME_MS);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [playing, lastIndex]);
+    return () => clearInterval(timer);
+  }, [isPlaying, lastIndex]);
 
   if (snapshots.length === 0) return null;
 
-  const currentCells = snapshots[frame];
+  const currentCells = frames[frame];
   const accuracy = accuracyAt(currentCells, target);
 
   return (
     <div className="mx-auto w-full max-w-sm">
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">Settling animation</h3>
+          <h3 className="text-sm font-semibold">Recalled output</h3>
           <p className="mt-1 text-xs text-slate-500">
             Sweep {frame} of {lastIndex}
           </p>
@@ -78,7 +67,7 @@ export function SnapshotPlayer({ snapshots, target }: SnapshotPlayerProps) {
       <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setFrame((f) => Math.max(0, f - 1))}
+          onClick={() => { setPlaying(false); setFrame((f) => Math.max(0, f - 1)); }}
           disabled={frame === 0}
           aria-label="Previous sweep"
           className="rounded-lg border border-slate-300 px-2.5 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -90,16 +79,16 @@ export function SnapshotPlayer({ snapshots, target }: SnapshotPlayerProps) {
           type="button"
           onClick={() => {
             if (frame >= lastIndex) setFrame(0);
-            setPlaying((p) => !p);
+            setPlaying(!isPlaying);
           }}
           className="flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
         >
-          {playing ? "Pause" : frame >= lastIndex ? "Replay" : "Play"}
+          {isPlaying ? "Pause" : frame >= lastIndex ? "Replay" : "Play"}
         </button>
 
         <button
           type="button"
-          onClick={() => setFrame((f) => Math.min(lastIndex, f + 1))}
+          onClick={() => { setPlaying(false); setFrame((f) => Math.min(lastIndex, f + 1)); }}
           disabled={frame === lastIndex}
           aria-label="Next sweep"
           className="rounded-lg border border-slate-300 px-2.5 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
