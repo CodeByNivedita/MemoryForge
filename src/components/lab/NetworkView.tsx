@@ -16,7 +16,7 @@ const ContextEdges = memo(function ContextEdges({
   points: ReturnType<typeof projectNeurons>;
 }) {
   return (
-    <g stroke="#64749d" strokeWidth="0.5" opacity="0.13">
+    <g stroke="#73858d" strokeWidth="0.5" opacity="0.13">
       {points.flatMap((p, i) =>
         points
           .slice(i + 1)
@@ -84,11 +84,6 @@ export function NetworkView({
             <stop offset="0" stopColor="#e2e8f0" stopOpacity=".35" />
             <stop offset="1" stopColor="#f8fafc" stopOpacity=".05" />
           </radialGradient>
-          <radialGradient id={id + '-node'} cx="30%" cy="25%">
-            <stop offset="0" stopColor="#8b7aee" />
-            <stop offset=".4" stopColor="#7563df" />
-            <stop offset="1" stopColor="#6554c0" />
-          </radialGradient>
           <pattern
             id={id + '-grid'}
             width="26"
@@ -121,7 +116,7 @@ export function NetworkView({
                   y1={origin.y}
                   x2={p.x}
                   y2={p.y}
-                  stroke={weights[selected][j] > 0 ? '#0d9488' : '#d97706'}
+                  stroke={weights[selected][j] > 0 ? '#0f766e' : '#b45309'}
                   strokeWidth={
                     0.65 + (Math.abs(weights[selected][j]) / max) * 1.5
                   }
@@ -167,8 +162,8 @@ export function NetworkView({
                   cx={p.x}
                   cy={p.y}
                   r={(spatial ? 12 : 20) * p.scale}
-                  fill={p.i === active ? '#fef3c7' : '#ede9fe'}
-                  stroke={p.i === active ? '#d97706' : '#6554e8'}
+                  fill={p.i === active ? '#fef3c7' : 'var(--color-blue-50)'}
+                  stroke={p.i === active ? '#b45309' : 'var(--color-blue-600)'}
                   strokeWidth="1.5"
                 />
               )}
@@ -176,8 +171,8 @@ export function NetworkView({
                 cx={p.x}
                 cy={p.y}
                 r={(spatial ? (p.i === selected ? 7 : 5.5) : 15) * p.scale}
-                fill={cells[p.i] === 1 ? 'url(#' + id + '-node)' : '#ffffff'}
-                stroke={cells[p.i] === 1 ? '#6554c0' : '#94a3b8'}
+                fill={cells[p.i] === 1 ? 'var(--color-blue-600)' : '#ffffff'}
+                stroke={cells[p.i] === 1 ? 'var(--color-blue-700)' : '#73858d'}
                 strokeWidth="1.2"
                 opacity={0.7 + (p.z + 1) * 0.15}
               />

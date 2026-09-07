@@ -8,11 +8,10 @@ export function Research() {
   const [writes, setWrites] = useState(0);
   return (
     <div className="mx-auto max-w-5xl py-10">
-      <p className="eyebrow">The research connection</p>
       <h1 className="page-title mt-2 max-w-3xl">From Hopfield to BDH.</h1>
       <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
         Our lab teaches associative memory. It is a stepping stone to
-        understanding connection-based state—not a reproduction of Pathway’s
+        understanding connection-based state, not a reproduction of Pathway’s
         Dragon Hatchling (BDH).
       </p>
       <section className="surface-panel mt-8 grid gap-8 p-6 sm:p-8 md:grid-cols-2">
@@ -60,9 +59,6 @@ export function Research() {
       <section className="surface-panel mt-6 p-6 sm:p-8">
         <div className="flex flex-wrap justify-between gap-3">
           <h2 className="text-xl font-semibold">Try one small Hebbian write</h2>
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs text-amber-900">
-            Illustration only · not BDH inference
-          </span>
         </div>
         <p className="mt-3 text-sm leading-7 text-slate-600">
           This two-by-two matrix starts at zero. Set X = [1, x] and Y = [y, 1],
@@ -208,7 +204,7 @@ export function Research() {
       </section>
       <section className="mt-10 grid gap-8 sm:grid-cols-2">
         <div>
-          <h2 className="text-xl font-semibold">Sources, not slogans</h2>
+          <h2 className="text-xl font-semibold">Sources:</h2>
           <ul className="mt-4 space-y-4 text-sm leading-6">
             <li>
               <a

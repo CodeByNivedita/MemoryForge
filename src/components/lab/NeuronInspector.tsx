@@ -72,7 +72,6 @@ export function NeuronInspector({
     <section className="surface-panel p-5" aria-label="Neuron microscope">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="eyebrow">Recall / neuron states change</p>
           <h2 className="mt-1 section-title">Neuron playback</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
             Follow a recorded update. The output grid stays in sync.
@@ -213,12 +212,6 @@ export function NeuronInspector({
             <h3 className="font-semibold text-slate-900">
               Neuron {inspected + 1}
             </h3>
-            <button
-              className="text-sm font-medium text-teal-700 underline underline-offset-4"
-              onClick={() => setFollow(true)}
-            >
-              Follow updates
-            </button>
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             {recorded

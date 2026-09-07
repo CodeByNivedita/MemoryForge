@@ -280,7 +280,6 @@ function App({
     <div className="min-w-0 py-7 text-slate-800 sm:py-9">
       <header className="mb-7 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="eyebrow">Interactive workspace</p>
           <h1 className="page-title mt-2">Memory lab</h1>
           <p className="mt-2 text-base text-slate-500">
             Create a memory. Damage its cue. Watch the network respond.
@@ -364,9 +363,6 @@ function App({
                 {editorMode === 'create' ? (
                   <>
                     <h2 className="section-title">Draw a pattern</h2>
-                    <p className="mb-4 mt-1 text-sm text-slate-500">
-                      Click pixels or choose a starter.
-                    </p>
                     <PatternGrid
                       label="Drawing"
                       cells={state.draft}
@@ -498,7 +494,7 @@ function App({
                             state.cue.filter((c, i) => c !== selected.cells[i])
                               .length
                           }{' '}
-                          of 64 pixels changed · seed {state.noiseSeed}
+                          of 64 pixels changed | seed {state.noiseSeed}
                         </p>
                       </div>
                     </>
@@ -691,9 +687,6 @@ function App({
                     <h2 className="section-title">
                       What did the network remember?
                     </h2>
-                    <span className="text-xs text-slate-500">
-                      Final result, independent of playback position
-                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 divide-slate-100 sm:grid-cols-4">
                     {[

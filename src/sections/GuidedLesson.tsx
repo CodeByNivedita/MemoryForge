@@ -123,7 +123,6 @@ export function GuidedLesson({
     <div className="py-10">
       <div className="mb-9 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Learn by doing</p>
           <h1 className="page-title mt-2">Learn associative memory.</h1>
           <p className="mt-3 text-slate-500">
             One claim, tested through five steps with a reproducible experiment.
@@ -166,9 +165,6 @@ export function GuidedLesson({
       </div>
       <div className="grid items-start gap-8 lg:grid-cols-[230px_1fr]">
         <aside className="surface-panel p-3 lg:p-4">
-          <p className="mb-4 hidden text-xs uppercase tracking-widest text-slate-500 lg:block">
-            Your learning path
-          </p>
           <ol className="grid grid-cols-5 gap-2 lg:block lg:space-y-2">
             {lessons.map((item, i) => (
               <li key={item.title}>
@@ -191,11 +187,6 @@ export function GuidedLesson({
               </li>
             ))}
           </ol>
-          <p className="mt-5 hidden border-t border-slate-100 pt-4 text-xs leading-5 text-slate-500 lg:block">
-            Same engine as the playground.
-            <br />
-            Seed {preset.run.seed} · target {preset.target.name}
-          </p>
         </aside>
         <section
           id="lesson-step"

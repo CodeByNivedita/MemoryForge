@@ -45,7 +45,7 @@ export default function Platform() {
     setRoute('lab');
   }
   return (
-    <div className="min-h-screen bg-[#f8f9fb] text-slate-800 antialiased [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
+    <div className="min-h-screen bg-slate-50 text-slate-800 antialiased [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
       <a
         href="#page-content"
         onClick={(e) => {
@@ -62,9 +62,6 @@ export default function Platform() {
           aria-label="MemoryForge home"
           className="mb-10 flex items-center gap-2.5 px-2"
         >
-          <span className="grid size-9 place-items-center rounded-xl bg-[#6554e8] text-lg font-bold text-white shadow-[0_5px_12px_-4px_#6554e880]">
-            m<span className="sr-only">MemoryForge</span>
-          </span>
           <span className="text-lg font-semibold tracking-tight text-slate-950">
             MemoryForge
           </span>
@@ -88,16 +85,16 @@ export default function Platform() {
               <Icon name={id} className="size-[18px] shrink-0" />
               {label}
               {route === id && (
-                <span className="ml-auto size-1.5 rounded-full bg-[#6554e8]" />
+                <span className="ml-auto size-1.5 rounded-full bg-coral" />
               )}
             </a>
           ))}
         </nav>
         <div className="mt-auto border-t border-slate-200 pt-5 px-2">
           <p className="text-sm font-medium text-slate-700">Hopfield network</p>
-          <p className="mt-1 text-xs text-slate-400">
-            64 neurons · computed locally
-          </p>
+          <span className="mt-1 text-xs text-slate-400">
+            (64 neurons)
+          </span>
           <a
             href="#research"
             className="mt-3 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-700"
@@ -108,13 +105,13 @@ export default function Platform() {
         </div>
       </aside>
       <div className="xl:pl-52">
-        <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white">
           <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-8">
             <a
               href="#home"
               className="text-lg font-semibold tracking-tight xl:hidden"
             >
-              MemoryForge<span className="text-[#6554e8]">.</span>
+              MemoryForge<span className="text-blue-600">.</span>
             </a>
             <div className="hidden items-center gap-3 text-sm xl:flex">
               <span className="text-slate-400">Workspace</span>
@@ -188,7 +185,6 @@ export default function Platform() {
           </div>
           {route === 'evidence' && (
             <div className="py-10">
-              <p className="eyebrow">Measure, don’t assume</p>
               <h1 className="page-title mt-2 mb-3">
                 Measure recall performance.
               </h1>
@@ -204,20 +200,8 @@ export default function Platform() {
         </main>
         <footer className="mx-auto mt-8 flex max-w-[1500px] flex-wrap items-center justify-between gap-4 border-t border-slate-200 px-5 py-6 text-xs text-slate-500 sm:px-8">
           <p>
-            MemoryForge · Classical Hopfield network · Not an implementation of
-            BDH
+            MemoryForge · Classical Hopfield network
           </p>
-          <nav aria-label="Footer navigation" className="flex flex-wrap gap-5">
-            <a href="#learn" className="hover:text-blue-700">
-              Learn
-            </a>
-            <a href="#lab" className="hover:text-blue-700">
-              Experiment
-            </a>
-            <a href="#research" className="hover:text-blue-700">
-              Sources & limitations
-            </a>
-          </nav>
         </footer>
       </div>
     </div>
