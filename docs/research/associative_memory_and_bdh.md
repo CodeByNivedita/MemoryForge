@@ -38,3 +38,13 @@ The research page's two-dimensional read/write widget illustrates an outer-produ
 - [Official Pathway BDH repository](https://github.com/pathwaycom/bdh).
 
 This project makes no claim to implement BDH-CQ, solve Sudoku, reproduce biological cognition, or reproduce the paper's performance.
+
+## Explainer design contract
+
+Central claim: For the same cue and update-order seed, adding memories to shared Hopfield weights can turn exact recall into a stable but incorrect result.
+
+The guided lesson uses seed 11, target index 0, noise seed 1011 and recall seed 2011. It compares 4 versus 16 memories with the same 13-pixel corruption and a 50-sweep cap. Results must be computed, not forced to match the claim. The lesson test checks exact recovery for the first run and stable incorrect recovery for the second.
+
+Keep Home a quiet introduction. The Learn page opens with a pausable replay of the fourth pattern's actual weight contribution. Keep the original reference beside computed results, distinguish final output from playback state, and disclose caps and approximations. Introduce the BDH state/parameter distinction during storage and interference, grounded in the primary paper, not only as a closing reference.
+
+Preserve a guided path into the sandbox. Controls should correspond to model variables or clearly labeled playback controls. Avoid searching the entire evaluation suite when opening the lesson; use the reproducible preset directly. Target sub-second control feedback, but measure it on representative devices before claiming this performance guarantee.

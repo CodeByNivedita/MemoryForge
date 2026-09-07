@@ -6,7 +6,6 @@ import {
   generateNoisyCopy,
   generateRandomPatterns,
 } from '../experiments';
-import { runControlledExperiments } from '../experiments/run-evaluation';
 import { PatternGrid } from '../components/lab/PatternGrid';
 import { StorageView } from '../components/lab/StorageView';
 import { NeuronInspector } from '../components/lab/NeuronInspector';
@@ -59,12 +58,10 @@ export function GuidedLesson({
   onOpenLab: (scenario: LabScenario) => void;
 }) {
   const preset = useMemo(() => {
-    const run = runControlledExperiments().memoryLoad.find(
-      (r) => r.patternCount === 16 && !r.metrics.exactRecall
-    );
-    if (!run) throw new Error('No measured interference example was found.');
-    const patterns = generateRandomPatterns(run.seed, 16);
-    const target = patterns.find((p) => p.id === run.targetPatternId)!;
+    // Fixed reproducible example; no dashboard-wide search on page load.
+    const patterns = generateRandomPatterns(11, 16);
+    const target = patterns[0];
+    const run = { seed: 11 };
     return {
       run,
       patterns,
@@ -74,7 +71,9 @@ export function GuidedLesson({
   }, []);
   const [step, setStep] = useState(0);
   const [completed, setCompleted] = useState(-1);
-  const [stored, setStored] = useState<readonly StoredPattern[]>([]);
+  const [stored, setStored] = useState<readonly StoredPattern[]>(() =>
+    preset.patterns.slice(0, 4)
+  );
   const [cue, setCue] = useState<PatternCells>(preset.target.cells);
   const [result, setResult] = useState<RecallResult | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
@@ -114,7 +113,8 @@ export function GuidedLesson({
   function restart() {
     setStep(0);
     setCompleted(-1);
-    setStored([]);
+    setStored(preset.patterns.slice(0, 4));
+    setRunId((id) => id + 1);
     setCue(preset.target.cells);
     setResult(null);
     setAnswer(null);
@@ -126,7 +126,7 @@ export function GuidedLesson({
           <p className="eyebrow">Learn by doing</p>
           <h1 className="page-title mt-2">Learn associative memory.</h1>
           <p className="mt-3 text-slate-500">
-            Five short steps, with the same experiment carried through each one.
+            One claim, tested through five steps with a reproducible experiment.
           </p>
         </div>
         <button
@@ -136,6 +136,21 @@ export function GuidedLesson({
           Restart lesson
         </button>
       </div>
+      <section className="surface-panel mb-7 p-5" aria-label="Claim to test">
+        <h2 className="text-sm font-semibold text-blue-700">
+          The claim to test
+        </h2>
+        <p className="mt-2 text-base leading-7 text-slate-800">
+          For the same cue and update-order seed, adding memories to shared
+          Hopfield weights can turn exact recall into a stable but incorrect
+          result.
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Compare 4 and 16 memories below. If the first output is wrong, or the
+          second is correct or not stable, this preset does not demonstrate the
+          claim. Then challenge it with your own patterns in the lab.
+        </p>
+      </section>
       <div
         className="mb-7 h-1.5 overflow-hidden rounded-full bg-slate-200"
         role="progressbar"
@@ -198,6 +213,43 @@ export function GuidedLesson({
           <div className="mt-6 rounded-lg border-l-2 border-teal-600 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             {lesson.note}
           </div>
+          {(step === 0 || step === 3) && (
+            <aside
+              aria-label="BDH connection"
+              className="mt-5 rounded-xl border border-blue-100 p-4 text-sm leading-6 text-slate-600"
+            >
+              <h3 className="font-semibold text-slate-900">
+                BDH connection: identify what changes
+              </h3>
+              <p className="mt-2">
+                In our Hopfield toy, storing a pattern changes W; recall changes
+                neuron activity while W stays fixed. In the Dragon Hatchling
+                (BDH) paper, inference also updates connection state through
+                co-activation:
+              </p>
+              <p className="my-2 font-mono text-slate-900">
+                σ(i,j) ← σ(i,j) + Y(i)X(j)
+              </p>
+              <p>
+                σ is evolving inference state, not a gradient update to trained
+                parameters. Both mechanisms write associations into shared
+                connections; this toy does not establish BDH recall accuracy or
+                convergence.
+              </p>
+              <a
+                href="https://arxiv.org/html/2509.26507v1#S1.SS2"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block text-blue-700 underline underline-offset-4"
+              >
+                Primary source: Dragon Hatchling §1.2, equations 1–2 ↗
+              </a>
+              <p className="mt-2">
+                Check: during Hopfield recall, does W change? No—only neuron
+                activity. BDH is a different system, not the model running here.
+              </p>
+            </aside>
+          )}
           {step === 4 && (
             <fieldset className="mt-6">
               <legend className="mb-3 text-sm font-medium">
@@ -277,6 +329,13 @@ export function GuidedLesson({
           </p>
         </section>
       </div>
+      <p className="mt-6 text-sm leading-6 text-slate-500">
+        Limits: 64 bipolar neurons, 4 or 16 seeded random memories, 13 flipped
+        pixels, at most 50 sweeps (3,200 single-neuron updates). Playback speed
+        changes viewing time only. This selected example is not a universal
+        capacity threshold. The initial replay adds the fourth pattern to the
+        first three; pause it at any time.
+      </p>
       {stored.length > 0 && !result && (
         <div className="mt-8">
           <StorageView key={runId} patterns={stored} />

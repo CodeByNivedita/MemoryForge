@@ -1,280 +1,260 @@
+import { useState } from 'react';
 import { Icon } from '../components/Icon';
-import { useEffect, useMemo, useState } from 'react';
-import { createWeightMatrix } from '../engine/hebbian';
-import { recall } from '../engine/recall';
-import { generateNoisyCopy, generateRandomPatterns } from '../experiments';
-import { NetworkView } from '../components/lab/NetworkView';
-import { PatternGrid } from '../components/lab/PatternGrid';
+
+const paths = [
+  {
+    id: 'learn',
+    label: 'Teach me',
+    title: 'Start with one memory.',
+    body: 'A guided experiment that connects the picture you see to the computations underneath.',
+    action: 'Begin the guided lesson',
+    steps: [
+      'See how a pattern becomes shared weights',
+      'Recover a memory from a damaged clue',
+      'Discover why a stable answer can be wrong',
+    ],
+  },
+  {
+    id: 'lab',
+    label: 'Let me explore',
+    title: 'Make it your experiment.',
+    body: 'Your patterns. Your noise level. A small network you can inspect, one decision at a time.',
+    action: 'Enter the pattern lab',
+    steps: [
+      'Draw and store your own patterns',
+      'Change the cue without changing the original',
+      'Inspect computed states and connection weights',
+    ],
+  },
+  {
+    id: 'evidence',
+    label: 'Show me results',
+    title: 'Put the idea to the test.',
+    body: 'Look beyond a single successful recall. Compare reproducible runs and see where recovery breaks down.',
+    action: 'Explore the evidence',
+    steps: [
+      'Compare increasing noise and memory load',
+      'Distinguish exact recall from convergence',
+      'Open a measured example in the lab',
+    ],
+  },
+] as const;
 
 export function Home() {
-  const demo = useMemo(() => {
-    const patterns = generateRandomPatterns(11, 4);
-    const target = patterns[0].cells;
-    const cue = generateNoisyCopy(target, 30, 1011).cells;
-    const weights = createWeightMatrix(patterns.map((p) => [...p.cells]));
-    return {
-      target,
-      cue,
-      weights,
-      result: recall(weights, [...cue], 2011, {
-        maxSweeps: 50,
-        captureUpdates: true,
-      }),
-    };
-  }, []);
-  const [frame, setFrame] = useState(-1);
-  const [playing, setPlaying] = useState(false);
-  const last = demo.result.updates.length - 1;
-  const running = playing && frame < last;
-  useEffect(() => {
-    if (!running) return;
-    const timer = window.setInterval(
-      () => setFrame((f) => Math.min(last, f + 1)),
-      40
-    );
-    return () => window.clearInterval(timer);
-  }, [running, last]);
-  const update = demo.result.updates[frame];
-  const cells = update?.state ?? demo.cue;
-  const matches = cells.filter((c, i) => c === demo.target[i]).length;
+  const [selected, setSelected] = useState(0);
   return (
-    <div className="py-7 sm:py-10">
-      <section className="mb-8 flex flex-wrap items-end justify-between gap-6 border-b border-slate-200 pb-8">
-        <div className="max-w-2xl">
-          <p className="eyebrow mb-4">
-            MemoryForge / Interactive neural memory
+    <div className="mx-auto max-w-6xl py-7 sm:py-10 lg:py-12">
+      <section className="grid items-center gap-10 border-b border-slate-200 pb-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:pb-14">
+        <div>
+          <p className="mb-6 flex items-center gap-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+            <span aria-hidden="true" className="h-px w-8 bg-blue-500" /> A field
+            guide to neural memory
           </p>
-          <h1 className="text-4xl font-semibold leading-[1.1] tracking-[-0.045em] text-slate-950 sm:text-5xl">
-            A little noise.
+          <h1 className="text-[clamp(2.5rem,6vw,4.5rem)] font-semibold leading-[1.07] tracking-[-0.05em] text-slate-950">
+            Memories aren't
             <br />
-            <span className="text-blue-600">A network that remembers.</span>
+            <span className="text-blue-600">just stored.</span>
+            <br />
+            They're connected.
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-slate-600">
-            Give a neural network an incomplete pattern. Watch its neurons work
-            toward a memory—then learn why they sometimes get it wrong.
+          <p className="mt-6 max-w-lg text-lg leading-8 text-slate-600">
+            Explore a small Hopfield network: how shared connections recover a
+            pattern, and why competing memories can lead to the wrong answer.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <a href="#learn" className="button-primary">
-            Start learning ↗
-          </a>
-          <a href="#lab" className="button-secondary">
-            Open the lab
-          </a>
-        </div>
-      </section>
-      <section
-        aria-label="Interactive recall demonstration"
-        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_-24px_#334155]"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-7">
-          <div className="flex items-center gap-3">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-              <Icon name="lab" />
-            </span>
-            <h2 className="font-semibold text-slate-900">
-              See recall in action
-            </h2>
-          </div>
-          <span className="text-xs text-slate-500">
-            Live computation · 4 stored memories · Seed 11
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-5 border-b border-slate-100 px-5 py-5 sm:px-7">
-          <button
-            onClick={() => {
-              if (frame >= last) setFrame(-1);
-              setPlaying(!running);
-            }}
-            className="button-primary"
+          <a
+            href="#learn"
+            className="button-primary group mt-7 inline-flex gap-6 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
           >
-            {running
-              ? 'Pause recall'
-              : frame >= last
-                ? 'Replay recall'
-                : 'Watch it recall →'}
-          </button>
-          <label className="min-w-32 flex-1 text-xs text-slate-500">
-            Recorded updates · {frame + 1} / {last + 1}
-            <input
-              aria-label="Demo recall timeline"
-              type="range"
-              min="-1"
-              max={last}
-              value={frame}
-              onChange={(e) => {
-                setPlaying(false);
-                setFrame(Number(e.target.value));
-              }}
-              className="mt-2 block w-full accent-blue-600"
-            />
-          </label>
-          <p className="max-w-52 text-xs leading-5 text-slate-500">
-            Real computed states, not a visual morph. During recall, weights
-            stay fixed.
+            Start learning <span aria-hidden="true">↗</span>
+          </a>
+          <p className="mt-4 text-sm text-slate-500">
+            No AI background needed.
           </p>
+          <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200/80 pt-5 text-sm text-slate-500">
+            <span>
+              <span className="font-semibold text-slate-700">64</span> visible
+              neurons
+            </span>
+            <span>Real computations</span>
+            <span>Runs locally</span>
+          </div>
         </div>
-        <div className="grid items-start lg:grid-cols-[minmax(150px,1fr)_minmax(0,2.4fr)_minmax(150px,1fr)]">
-          <div className="p-5 sm:p-7">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              01 / The input
-            </p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-900">
-              A damaged memory
-            </h3>
-            <div className="my-5 max-w-40">
-              <PatternGrid label="Demo damaged cue" cells={demo.cue} readOnly />
-            </div>
-            <p className="text-sm leading-6 text-slate-600">
-              19 of 64 pixels flipped. The network sees only this noisy copy.
-            </p>
-            <div className="mt-5 border-t border-slate-100 pt-4">
-              <p className="mb-3 text-xs font-medium text-slate-500">
-                Original · retained for comparison
-              </p>
-              <div className="max-w-40">
-                <PatternGrid
-                  label="Demo original pattern"
-                  cells={demo.target}
-                  readOnly
+
+        <div className="relative min-w-0 rounded-3xl border border-slate-200/90 bg-white p-4 shadow-[0_16px_50px_-30px_#6554e845] sm:p-7">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Find your starting point
+            </h2>
+            <span className="font-mono text-xs text-slate-400">
+              0{selected + 1} / 03
+            </span>
+          </div>
+          <fieldset className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+            <legend className="sr-only">
+              How would you like to explore MemoryForge?
+            </legend>
+            {paths.map((item, i) => (
+              <label key={item.id} className="relative cursor-pointer">
+                <input
+                  type="radio"
+                  name="home-path"
+                  value={item.id}
+                  checked={selected === i}
+                  onChange={() => setSelected(i)}
+                  className="peer sr-only"
                 />
-              </div>
-            </div>
-          </div>
-          <div className="min-w-0 border-y border-slate-100 bg-slate-50/60 p-3 sm:p-5 lg:border-x lg:border-y-0">
-            <div className="mb-4 flex items-center justify-between gap-2 px-1">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                02 / Inside the network
-              </p>
-              <span className="text-xs text-blue-700">
-                {running
-                  ? 'Recalling'
-                  : frame === last
-                    ? 'Complete'
-                    : 'Ready to explore'}
-              </span>
-            </div>
-            <div className="mx-auto max-w-[520px]">
-              <NetworkView
-                weights={demo.weights}
-                cells={cells}
-                selected={update?.neuron ?? 0}
-                active={update?.neuron}
-              />
-            </div>
-            <p className="mt-3 px-1 text-xs leading-5 text-slate-500">
-              Filled = ON (+1). Outlined = OFF (−1). The amber ring marks the
-              neuron being updated.
-            </p>
-          </div>
-          <div className="p-5 sm:p-7">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              03 / The result
-            </p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-900">
-              {frame === last ? 'Final state' : 'Current state'}
-            </h3>
-            <div className="my-5 max-w-40">
-              <PatternGrid
-                label="Demo current computed state"
-                cells={cells as (-1 | 1)[]}
-                readOnly
-              />
-            </div>
-            <p className="text-3xl font-semibold tracking-tight text-slate-900">
-              {matches}
-              <span className="text-lg font-normal text-slate-400"> / 64</span>
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              pixels match the original
-            </p>
-            <div className="mt-5 border-t border-slate-100 pt-4 text-sm leading-6 text-slate-600">
-              {update
-                ? 'Neuron ' +
-                  (update.neuron + 1) +
-                  ': weighted input ' +
-                  update.weightedInput.toFixed(4) +
-                  '. State ' +
-                  update.previousState +
-                  ' → ' +
-                  update.newState +
-                  '.'
-                : 'Each neuron reads the weighted votes of the others to choose its next state.'}
-            </div>
-          </div>
-        </div>
-      </section>
-      <section className="mt-12">
-        <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-            One idea. Three ways to explore it.
-          </h2>
-          <p className="text-sm text-slate-500">
-            No neural-network background needed.
-          </p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            [
-              '01',
-              'learn',
-              'Learn the idea',
-              'A guided experiment',
-              'Store a memory, damage its cue, and discover why a stable result can still be wrong.',
-              'Start learning',
-            ],
-            [
-              '02',
-              'lab',
-              'Build an experiment',
-              'An open workspace',
-              'Draw your own patterns. Watch weight learning, then inspect each decision during recall.',
-              'Enter the lab',
-            ],
-            [
-              '03',
-              'evidence',
-              'Check the evidence',
-              'Measured results',
-              'Compare noise and memory load across fixed seeds. Reproduce successes and failures.',
-              'Explore results',
-            ],
-          ].map(([n, route, title, tag, body, action]) => (
-            <a
-              key={route}
-              href={'#' + route}
-              className="group flex flex-col rounded-2xl border border-slate-200/80 bg-white p-6 transition-[border-color,box-shadow] duration-150 hover:border-blue-200 hover:shadow-md motion-reduce:transition-none"
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm text-blue-600">
-                  <Icon name={route as 'learn' | 'lab' | 'evidence'} />
-                  <span className="text-xs text-slate-400">{n}</span>
+                <span className="flex h-full min-h-11 items-center justify-center rounded-lg px-2 py-2 text-center text-sm font-medium text-slate-600 transition-colors duration-150 hover:text-blue-700 peer-checked:bg-white peer-checked:text-blue-700 peer-checked:shadow-sm peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blue-600">
+                  {item.label}
                 </span>
-                <span className="text-sm text-slate-400">{tag}</span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="mt-6 grid">
+            {paths.map((path, index) => (
+              <div
+                key={path.id}
+                inert={selected !== index}
+                aria-hidden={selected !== index}
+                className={`col-start-1 row-start-1 flex flex-col ${selected === index ? 'visible' : 'invisible'}`}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <span className="flex size-12 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+                    <Icon name={path.id} />
+                  </span>
+                  <span className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500">
+                    {index === 0
+                      ? 'Guided · 5 steps'
+                      : index === 1
+                        ? 'Sandbox · self-paced'
+                        : 'Evidence · reproducible'}
+                  </span>
+                </div>
+                <h3 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950">
+                  {path.title}
+                </h3>
+                <p className="mt-3 text-base leading-7 text-slate-600">
+                  {path.body}
+                </p>
+                <ol className="mb-7 mt-5 flex-1 space-y-4 border-t border-slate-100 pt-5">
+                  {path.steps.map((step, i) => (
+                    <li
+                      key={step}
+                      className="flex items-start gap-3 text-sm leading-6 text-slate-600"
+                    >
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-xs text-slate-500">
+                        {i + 1}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+                <a
+                  href={'#' + path.id}
+                  className="group flex min-h-12 items-center justify-between gap-3 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+                >
+                  {path.action}
+                  <span
+                    aria-hidden="true"
+                    className="transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transform-none"
+                  >
+                    ↗
+                  </span>
+                </a>
               </div>
-              <h3 className="mt-6 text-xl font-semibold tracking-tight text-slate-900">
-                {title}
-              </h3>
-              <p className="mt-3 flex-1 text-sm leading-6 text-slate-500">
-                {body}
-              </p>
-              <span className="mt-6 text-sm font-semibold text-blue-700">
-                {action} ↗
-              </span>
-            </a>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      <p className="mt-8 text-sm leading-6 text-slate-500">
-        A classical Hopfield network—not a chatbot or a biological brain.{' '}
+      <section
+        className="grid gap-6 py-9 sm:py-12 lg:grid-cols-[.7fr_1.3fr]"
+        aria-labelledby="idea-heading"
+      >
+        <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-blue-700">
+            The idea behind the experiment
+          </p>
+          <h2
+            id="idea-heading"
+            className="mt-3 text-2xl font-semibold tracking-tight text-slate-900"
+          >
+            Shared connections.
+            <br />
+            Competing memories.
+          </h2>
+        </div>
+        <div>
+          <p className="text-lg leading-8 text-slate-600">
+            With the same cue and update order, adding memories to shared
+            Hopfield weights can turn a correct recall into a stable but
+            incorrect answer.
+          </p>
+          <a
+            href="#learn"
+            className="mt-4 inline-flex items-center gap-3 text-sm font-semibold text-blue-700 rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+          >
+            Test the claim in the guided lesson{' '}
+            <span aria-hidden="true">→</span>
+          </a>
+        </div>
+      </section>
+
+      <h2 className="mb-4 text-lg font-semibold tracking-tight text-slate-900">
+        A few things before you start
+      </h2>
+      <section
+        aria-label="Before you begin"
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+      >
+        {[
+          [
+            'What will I actually learn?',
+            'How associations are written into shared weights, how neuron states change during recall, and how competing memories can interfere. You will compare the intended answer with the computed result.',
+          ],
+          [
+            'Is this a real neural network?',
+            'Yes—a small, classical Hopfield network with 64 bipolar neurons. The lab computes its weights and updates locally. It is not a chatbot or a simulation of a biological brain.',
+          ],
+          [
+            'How does this connect to BDH?',
+            'The lesson connects shared associations to the Dragon Hatchling paper’s evolving connection state. It explains the distinction: Hopfield weights stay fixed during recall; BDH can update inference state. MemoryForge does not implement BDH.',
+          ],
+        ].map(([question, answer]) => (
+          <details
+            key={question}
+            name="home-questions"
+            className="group border-b border-slate-100 last:border-b-0"
+          >
+            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-5 text-base font-medium text-slate-800 marker:content-none hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 sm:px-7 [&::-webkit-details-marker]:hidden">
+              {question}
+              <span
+                aria-hidden="true"
+                className="text-xl font-normal text-blue-600 group-open:hidden"
+              >
+                +
+              </span>
+              <span
+                aria-hidden="true"
+                className="hidden text-xl font-normal text-blue-600 group-open:inline"
+              >
+                −
+              </span>
+            </summary>
+            <p className="max-w-3xl px-5 pb-6 text-base leading-7 text-slate-600 sm:px-7">
+              {answer}
+            </p>
+          </details>
+        ))}
+      </section>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
+        <p>Small model. Visible state. Reproducible experiments.</p>
         <a
           href="#research"
-          className="font-medium text-blue-700 underline underline-offset-4"
+          className="text-blue-700 rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
         >
-          Read the model’s assumptions and limitations ↗
+          Read the sources &amp; limitations ↗
         </a>
-      </p>
+      </div>
     </div>
   );
 }

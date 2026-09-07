@@ -7,6 +7,13 @@ describe('Guided learning sequence', () => {
     const open = vi.fn();
     render(<GuidedLesson onOpenLab={open} />);
     expect(screen.queryByRole('button', { name: 'Continue →' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Pause weight replay' })
+    ).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Claim to test' })).toBeTruthy();
+    expect(
+      screen.getByRole('complementary', { name: 'BDH connection' })
+    ).toBeTruthy();
     fireEvent.click(
       screen.getByRole('button', { name: 'Store four patterns' })
     );
@@ -42,7 +49,7 @@ describe('Guided learning sequence', () => {
     );
     expect(
       screen.getByText(
-        /16 patterns stored · 13 pixels changed · exact recall: no/
+        /16 patterns stored · 13 pixels changed · exact recall: no · converged: yes/
       )
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Continue →' }));
