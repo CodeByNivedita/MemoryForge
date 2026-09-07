@@ -1,4 +1,5 @@
 import type { RecallMetrics } from "../../experiments";
+import { generateNoisyCopy } from "../../experiments/noise";
 import { generateNoisyCopy } from "../../experiments";
 
 export const GRID_SIZE = 8;
@@ -104,16 +105,30 @@ export const PRESETS: readonly StoredPattern[] = Object.freeze([
   },
 ]);
 
+export interface LabScenario {
+  readonly stored: readonly StoredPattern[];
+  readonly selectedId: string;
+  readonly cue: PatternCells;
+  readonly label: string;
+  readonly recallSeed: number;
+  readonly maxSweeps: number;
+  readonly noiseSeed: number;
+}
+
 export interface LabState {
   readonly draft: PatternCells;
   readonly name: string;
   readonly stored: readonly StoredPattern[];
   readonly selectedId: string | null;
   readonly cue: PatternCells | null;
-
-  // Hopfield recall result
   readonly recalled: PatternCells | null;
   readonly recallMetrics: RecallMetrics | null;
+  readonly snapshots: readonly PatternCells[] | null;
+  readonly recallVersion: number;
+  readonly scenarioLabel: string | null;
+  readonly recallSeed: number;
+  readonly maxSweeps: number;
+  readonly noiseSeed: number;
   readonly snapshots: readonly PatternCells[] | null;
   // Incremented on every recall so the snapshot player can key off it and
   // reset its own frame/playback state without syncing via an effect.
@@ -127,6 +142,13 @@ export interface LabState {
   readonly announcement: string;
 }
 
+const clearedResult = {
+  recalled: null,
+  recallMetrics: null,
+  snapshots: null,
+  scenarioLabel: null,
+};
+
 export function createLabState(): LabState {
   return {
     draft: [...PRESETS[0].cells],
@@ -134,6 +156,11 @@ export function createLabState(): LabState {
     stored: [],
     selectedId: null,
     cue: null,
+    ...clearedResult,
+    recallVersion: 0,
+    recallSeed: 42,
+    maxSweeps: 100,
+    noiseSeed: 42,
 
     recalled: null,
     recallMetrics: null,
@@ -156,10 +183,14 @@ export type LabAction =
   | { type: "cue"; cells: PatternCells }
   | { type: "restore-cue" }
   | { type: "add-noise"; percent: number }
+  | { type: "add-noise"; percent: number }
   | {
       type: "recall-result";
       recalled: PatternCells;
       recallMetrics: RecallMetrics;
+      snapshots: readonly PatternCells[];
+    }
+  | ({ type: "load-scenario" } & LabScenario);
       snapshots: readonly PatternCells[];
     }
   | {
@@ -189,9 +220,16 @@ export function labReducer(state: LabState, action: LabAction): LabState {
         : state;
     }
     case "recall-result":
+      if (!state.selectedId || !state.cue) return state;
       assertPattern(action.recalled);
-
+      action.snapshots.forEach(assertPattern);
       return {
+        ...state,
+        recalled: [...action.recalled],
+        recallMetrics: action.recallMetrics,
+        snapshots: action.snapshots.map((frame) => [...frame]),
+        recallVersion: state.recallVersion + 1,
+        announcement: "Recall completed.",
       ...state,
       recalled: [...action.recalled],
       recallMetrics: action.recallMetrics,
@@ -200,16 +238,21 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       announcement: "Recall completed.",
       };
     case "store": {
+      let number = state.nextNumber;
+      while (state.stored.some((item) => item.id === `pattern-${number}`)) number += 1;
       const pattern: StoredPattern = {
-        id: `pattern-${state.nextNumber}`,
-        name: state.name.trim() || `Pattern ${state.nextNumber}`,
+        id: `pattern-${number}`,
+        name: state.name.trim() || `Pattern ${number}`,
         cells: [...state.draft],
       };
       return {
         ...state,
+        ...clearedResult,
         stored: [...state.stored, pattern],
         selectedId: pattern.id,
         cue: [...pattern.cells],
+        nextNumber: number + 1,
+        name: `Pattern ${number + 1}`,
         nextNumber: state.nextNumber + 1,
         name: `Pattern ${state.nextNumber + 1}`,
         scenarioLabel: null,
@@ -221,6 +264,7 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       return pattern
         ? {
             ...state,
+            ...clearedResult,
             selectedId: pattern.id,
             cue: [...pattern.cells],
             recalled: null,
@@ -231,6 +275,14 @@ export function labReducer(state: LabState, action: LabAction): LabState {
         : state;
     }
     case "cue":
+      if (!state.selectedId) return state;
+      assertPattern(action.cells);
+      return {
+        ...state,
+        ...clearedResult,
+        cue: [...action.cells],
+        announcement: "Cue edited. Run recall again to update the result.",
+      };
   if (!state.selectedId) return state;
   assertPattern(action.cells);
 
@@ -246,6 +298,7 @@ export function labReducer(state: LabState, action: LabAction): LabState {
       return pattern
         ? {
             ...state,
+            ...clearedResult,
             cue: [...pattern.cells],
             announcement: `Cue restored from ${pattern.name}.`,
             recalled: null,
@@ -253,6 +306,47 @@ export function labReducer(state: LabState, action: LabAction): LabState {
             snapshots: null,
           }
         : state;
+    }
+    case "add-noise": {
+      const pattern = state.stored.find((item) => item.id === state.selectedId);
+      if (!pattern) return state;
+      // Always start from the original: repeated clicks are reproducible,
+      // and the selected percentage is not mistaken for cumulative damage.
+      const noisy = generateNoisyCopy(pattern.cells, action.percent, state.noiseSeed);
+      return {
+        ...state,
+        ...clearedResult,
+        cue: [...noisy.cells],
+        announcement: `Flipped ${noisy.flippedPixels} of 64 original cells (${action.percent}% requested noise).`,
+      };
+    }
+    case "load-scenario": {
+      assertPattern(action.cue);
+      action.stored.forEach((pattern) => assertPattern(pattern.cells));
+      if (
+        !action.stored.some((pattern) => pattern.id === action.selectedId) ||
+        new Set(action.stored.map((pattern) => pattern.id)).size !== action.stored.length
+      ) {
+        throw new RangeError("A scenario needs a stored target and unique pattern IDs.");
+      }
+      if (
+        !Number.isSafeInteger(action.maxSweeps) || action.maxSweeps < 1 ||
+        !Number.isFinite(action.recallSeed) || !Number.isFinite(action.noiseSeed)
+      ) {
+        throw new RangeError("A scenario needs finite seeds and a positive integer sweep limit.");
+      }
+      return {
+        ...state,
+        ...clearedResult,
+        stored: action.stored.map((pattern) => ({ ...pattern, cells: [...pattern.cells] })),
+        selectedId: action.selectedId,
+        cue: [...action.cue],
+        scenarioLabel: action.label,
+        recallSeed: action.recallSeed,
+        maxSweeps: action.maxSweeps,
+        noiseSeed: action.noiseSeed,
+        announcement: `${action.label} loaded into the Pattern Lab.`,
+      };
     }
     case "add-noise": {
       if (!state.selectedId || !state.cue) return state;

@@ -10,7 +10,6 @@ import {
 import {
   generateRandomPattern,
   generateNoisyCopy,
-  type PatternCells,
 } from "./pattern";
 
 const CELL_COUNT = 64;
@@ -67,6 +66,13 @@ export function runRecallExperiment(
   config: ExperimentConfig,
 ): RecallRun {
   const maxSweeps = config.maxSweeps ?? DEFAULT_MAX_SWEEPS;
+  if (!Number.isSafeInteger(config.patternCount) || config.patternCount < 1) {
+    throw new RangeError("patternCount must be a positive integer.");
+  }
+  if (!Number.isFinite(config.seed)) throw new RangeError("seed must be finite.");
+  if (!Number.isSafeInteger(maxSweeps) || maxSweeps < 1) {
+    throw new RangeError("maxSweeps must be a positive integer.");
+  }
 
   const storedPatterns = createStoredPatterns(
     config.seed,
@@ -74,6 +80,7 @@ export function runRecallExperiment(
   );
 
   if (
+    !Number.isInteger(config.targetIndex) ||
     config.targetIndex < 0 ||
     config.targetIndex >= storedPatterns.length
   ) {
@@ -85,14 +92,9 @@ export function runRecallExperiment(
   const target = storedPatterns[config.targetIndex];
 
   // Create noisy input from the actual target.
-  const noisyInput: PatternCells =
-    config.noisePercent > 0
-      ? generateNoisyCopy(
-          target.cells,
-          config.noisePercent,
-          config.seed + 1000,
-        )
-      : [...target.cells];
+  const noisyInput = generateNoisyCopy(
+    target.cells, config.noisePercent, config.seed + 1000,
+  ).cells;
 
   // ============================================================
   // ACTUAL MEMORY ENGINE
@@ -470,7 +472,7 @@ export function calculateAggregateStats(
  * 1. Exact recall
  * 2. Converged
  * 3. Fewer sweeps
- * 4. Lower computation time
+ * 4. Deterministic configuration tie-break (timings vary by machine)
  */
 function selectSuccessExample(
   results: readonly RecallRun[],
@@ -491,8 +493,8 @@ function selectSuccessExample(
     }
 
     return (
-      a.metrics.recallTimeMs -
-      b.metrics.recallTimeMs
+      a.seed - b.seed || a.patternCount - b.patternCount ||
+      a.noisePercent - b.noisePercent || a.targetPatternId.localeCompare(b.targetPatternId)
     );
   });
 

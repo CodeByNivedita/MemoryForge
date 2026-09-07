@@ -1,3 +1,6 @@
+import { generateNoisyCopy } from "./noise";
+
+export { generateNoisyCopy };
 export const GRID_SIZE = 8;
 export const CELL_COUNT = GRID_SIZE * GRID_SIZE;
 
@@ -149,6 +152,11 @@ export function generateRandomPattern(seed: number): ExperimentPattern {
   });
 }
 
+export function generateRandomPatterns(seed: number, count: number): readonly ExperimentPattern[] {
+  return Object.freeze(Array.from({ length: count }, (_, i) => generateRandomPattern(seed + i)));
+}
+
+export const RANDOM_PATTERNS: readonly ExperimentPattern[] = generateRandomPatterns(1, 8);
 /**
  * Generate a collection of reproducible random patterns.
  */

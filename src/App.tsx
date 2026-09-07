@@ -5,85 +5,30 @@ import {
   createLabState,
   labReducer,
   PRESETS,
-} from './components/lab/patterns';
-import type { Cell, PatternCells } from './components/lab/patterns';
-import { createWeightMatrix } from './engine/hebbian';
-import { recall } from './engine/recall';
-import { generateNoisyCopy } from './experiments';
+} from "./components/lab/patterns";
+import type { PatternCells, StoredPattern } from "./components/lab/patterns";
+import { SnapshotPlayer } from "./components/lab/Snapshotplayer.tsx";
+import { FailureAnalysis } from "./components/lab/FailureAnalysis";
+import { ExperimentDashboard } from "./components/lab/ExperimentDashboard";
+import { downloadJson } from "../utils/download/download";
 
-const panel = 'rounded-xl border border-slate-200 bg-white p-5 sm:p-6';
-const heading = 'text-base font-semibold tracking-tight text-slate-900';
-const help = 'text-sm leading-6 text-slate-500';
 
-function WeightMatrixPreview({ weights }: { weights: number[][] }) {
-  return (
-    <section className={panel} aria-labelledby="weights-heading">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h2 id="weights-heading" className={heading}>
-            Weight matrix
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            64 × 64 Hebbian connection weights
-          </p>
-        </div>
-        <span className="text-xs tabular-nums text-slate-500">
-          {weights.length === 0 ? 'No weights' : '4,096 values'}
-        </span>
-      </div>
-      {weights.length === 0 ? (
-        <div className="rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-500">
-          Store a pattern to calculate the weights.
-        </div>
-      ) : (
-        <div
-          className="max-h-80 overflow-auto rounded-lg border border-slate-200"
-          tabIndex={0}
-          aria-label="Scrollable 64 by 64 weight matrix"
-        >
-          <table className="border-separate border-spacing-0 font-mono text-[11px] tabular-nums text-slate-600">
-            <thead>
-              <tr>
-                <th className="sticky top-0 left-0 z-20 border-r border-b border-slate-200 bg-slate-100 px-2 py-1.5 text-slate-500">
-                  i\j
-                </th>
-                {weights.map((_, column) => (
-                  <th
-                    key={column}
-                    scope="col"
-                    className="sticky top-0 z-10 min-w-14 border-b border-slate-200 bg-slate-100 px-2 py-1.5 font-medium text-slate-500"
-                  >
-                    {column + 1}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {weights.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  <th
-                    scope="row"
-                    className="sticky left-0 border-r border-b border-slate-200 bg-slate-100 px-2 py-1.5 font-medium text-slate-500"
-                  >
-                    {rowIndex + 1}
-                  </th>
-                  {row.map((weight, columnIndex) => (
-                    <td
-                      key={columnIndex}
-                      className={`border-r border-b border-slate-100 px-2 py-1.5 text-right ${rowIndex === columnIndex ? 'bg-slate-50 text-slate-400' : 'bg-white'}`}
-                    >
-                      {weight.toFixed(3)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
+
+
+import { createWeightMatrix } from "./engine/hebbian";
+import { recall } from "./engine/recall";
+import { buildRecallMetrics } from "./experiments/evaluation";
+
+const NOISE_PRESETS = [10, 20, 30, 40, 50];
+
+const panel =
+  "rounded-xl border border-slate-200 bg-white p-5 sm:p-6";
+
+const heading =
+  "text-base font-semibold tracking-tight text-slate-900";
+
+const help =
+  "text-sm leading-6 text-slate-500";
 
 function App() {
   const [state, dispatch] = useReducer(labReducer, undefined, createLabState);
@@ -93,72 +38,83 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const selected = state.stored.find(
-    (pattern) => pattern.id === state.selectedId
-  );
-  const weights = useMemo(
-    () =>
-      state.stored.length === 0
-        ? []
-        : createWeightMatrix(
-            state.stored.map((pattern) => Array.from(pattern.cells))
-          ),
-    [state.stored]
+    (pattern) => pattern.id === state.selectedId,
   );
 
-  const displayedRecall = trace[frameIndex] ?? null;
-  const finalFrameIndex = Math.max(0, trace.length - 1);
+  // --------------------------------------------------
+  // HOPFIELD RECALL
+  // --------------------------------------------------
 
-  useEffect(() => {
-    if (!isPlaying || trace.length === 0) return;
+  const handleRecall = () => {
+    if (!selected || !state.cue) {
+      return;
+    }
 
-    const nextFrame = Math.min(frameIndex + 1, trace.length - 1);
-    const timer = window.setTimeout(() => {
-      setFrameIndex(nextFrame);
-      if (nextFrame >= trace.length - 1) setIsPlaying(false);
-    }, 700 / playbackSpeed);
-    return () => window.clearTimeout(timer);
-  }, [frameIndex, isPlaying, playbackSpeed, trace.length]);
+    // Train the Hopfield network using all stored memories.
+    const weights = createWeightMatrix(
+      state.stored.map((pattern) => [...pattern.cells]),
+    );
 
-  function clearPlayback() {
-    setTrace([]);
-    setFrameIndex(0);
-    setIsPlaying(false);
-  }
+    // Run recall on the current cue.
+    const startTime = performance.now();
 
-  function selectPattern(id: string) {
-    dispatch({ type: 'select', id });
-    setNoisePercentage(0);
-    clearPlayback();
-  }
-
-  function resetExperiment() {
-    dispatch({ type: 'restore-cue' });
-    setNoisePercentage(0);
-    clearPlayback();
-  }
-
-  function applyNoise(percentage: number) {
-    if (!selected) return;
-    const noisyCopy = generateNoisyCopy(selected.cells, percentage, 42);
-    setNoisePercentage(percentage);
-    dispatch({ type: 'cue', cells: noisyCopy.cells });
-    clearPlayback();
-  }
-
-  function runRecall() {
-    if (!state.cue || weights.length === 0) return;
-    const result = recall(weights, Array.from(state.cue), 'recall', {
-      maxSweeps: 100,
-    });
-    const recordedStates: PatternCells[] = [
+    const result = recall(
+      weights,
       [...state.cue],
-      ...result.snapshots.map((snapshot) =>
-        snapshot.map((cell): Cell => (cell === 1 ? 1 : -1))
-      ),
-    ];
-    setTrace(recordedStates);
-    setFrameIndex(0);
-    setIsPlaying(recordedStates.length > 1);
+      42,
+    );
+
+    const recallTimeMs =
+      performance.now() - startTime;
+
+    // Calculate recall metrics.
+    const metrics = buildRecallMetrics(
+      result.finalState,
+      selected,
+      state.stored,
+      result,
+      100,
+      recallTimeMs,
+    );
+
+    // Send result to reducer.
+    dispatch({
+      type: "recall-result",
+      recalled: result.finalState as (-1 | 1)[],
+      recallMetrics: metrics,
+      snapshots: result.snapshots as (-1 | 1)[][],
+    });
+  };
+
+  function handleLoadScenario(scenario: {
+    stored: readonly StoredPattern[];
+    selectedId: string;
+    cue: PatternCells;
+    label: string;
+  }) {
+    dispatch({
+      type: "load-scenario",
+      stored: scenario.stored,
+      selectedId: scenario.selectedId,
+      cue: scenario.cue,
+      label: scenario.label,
+    });
+    setTab("lab");
+  }
+
+  function handleExportSession() {
+    if (!selected || !state.cue) return;
+
+    downloadJson("memoryforge-session.json", {
+      generatedAt: new Date().toISOString(),
+      scenarioLabel: state.scenarioLabel,
+      storedPatterns: state.stored,
+      target: selected,
+      cue: state.cue,
+      recalled: state.recalled,
+      recallMetrics: state.recallMetrics,
+      snapshots: state.snapshots,
+    });
   }
 
   return (
@@ -315,10 +271,16 @@ function App() {
               )}
             </section>
 
-            <section className={panel} aria-labelledby="comparison-heading">
-              <h2 id="comparison-heading" className={heading}>
-                Recall experiment
-              </h2>
+
+            {/* =========================================
+                RECALL / COMPARISON
+                ========================================= */}
+
+            <section
+              className={panel}
+              aria-labelledby="comparison-heading"
+            >
+
               {selected && state.cue ? (
                 <>
                   <p className="mt-1 text-sm text-slate-500 wrap-anywhere">
@@ -392,35 +354,39 @@ function App() {
                       <PatternGrid
                         label="Cue"
                         cells={state.cue}
-                        onChange={(cells) => {
-                          dispatch({ type: 'cue', cells });
-                          setNoisePercentage(
-                            Math.round(
-                              (cells.filter(
-                                (cell, index) => cell !== selected.cells[index]
-                              ).length /
-                                cells.length) *
-                                100
-                            )
-                          );
-                          clearPlayback();
-                        }}
-                        onReset={resetExperiment}
-                        resetLabel="Reset"
+                        onChange={(cells) =>
+                          dispatch({
+                            type: "cue",
+                            cells,
+                          })
+                        }
+                        onReset={() =>
+                          dispatch({
+                            type: "restore-cue",
+                          })
+                        }
+                        resetLabel="Restore cue"
                       />
-                    </div>
-                    <div className="mx-auto w-full max-w-sm">
-                      <div className="mb-3">
-                        <h3 className="text-sm font-semibold">
-                          Recalled output
-                        </h3>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {displayedRecall
-                            ? frameIndex === 0
-                              ? 'Recorded input cue'
-                              : `Recorded sweep ${frameIndex} of ${finalFrameIndex}`
-                            : 'Run recall to calculate'}
+
+                      {/* NOISE CONTROLS */}
+                      <div className="mt-3">
+                        <p className="mb-1.5 text-xs text-slate-500">
+                          Add noise to cue
                         </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {NOISE_PRESETS.map((percent) => (
+                            <button
+                              key={percent}
+                              type="button"
+                              onClick={() =>
+                                dispatch({ type: "add-noise", percent })
+                              }
+                              className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+                            >
+                              +{percent}%
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <PatternGrid
                         label={
@@ -467,46 +433,162 @@ function App() {
                       >
                         Previous sweep
                       </button>
-                      <button
-                        type="button"
-                        disabled={
-                          trace.length === 0 || frameIndex >= finalFrameIndex
-                        }
-                        onClick={() => {
-                          setIsPlaying(false);
-                          setFrameIndex((index) =>
-                            Math.min(finalFrameIndex, index + 1)
-                          );
-                        }}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Next sweep
-                      </button>
-                      <button
-                        type="button"
-                        disabled={trace.length === 0}
-                        onClick={() => {
-                          setFrameIndex(0);
-                          setIsPlaying(trace.length > 1);
-                        }}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Restart playback
-                      </button>
-                      <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
-                        Speed
-                        <select
-                          value={playbackSpeed}
-                          onChange={(event) =>
-                            setPlaybackSpeed(Number(event.target.value))
+
+                    </div>
+
+
+                    {/* RECOVERED / SETTLING ANIMATION */}
+                    {state.recalled && (
+
+                      state.snapshots && state.snapshots.length > 0 ? (
+
+                        <SnapshotPlayer
+                          key={state.recallVersion}
+                          snapshots={state.snapshots}
+                          target={selected.cells}
+                        />
+
+                      ) : (
+
+                      <div className="mx-auto w-full max-w-sm">
+
+                        <div className="mb-3">
+
+                          <h3 className="text-sm font-semibold">
+                            Recovered
+                          </h3>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            Hopfield network output
+                          </p>
+
+                        </div>
+
+                        <PatternGrid
+                          label="Recovered"
+                          cells={state.recalled}
+                          readOnly
+                        />
+
+                      </div>
+
+                      )
+
+                    )}
+
+                  </div>
+
+
+                  {/* =================================
+                      RECALL METRICS
+                      ================================= */}
+
+                  {state.recallMetrics && (
+
+                    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+
+                      {/* EXACT RECALL */}
+                      <div className="rounded-lg bg-slate-50 p-4">
+
+                        <p className="text-xs text-slate-500">
+                          Exact recall
+                        </p>
+
+                        <p className="mt-1 text-lg font-semibold">
+                          {state.recallMetrics.exactRecall
+                            ? "Yes"
+                            : "No"}
+                        </p>
+
+                      </div>
+
+
+                      {/* COMPUTATION TIME */}
+                      <div className="rounded-lg bg-slate-50 p-4">
+
+                        <p className="text-xs text-slate-500">
+                          Recall time
+                        </p>
+
+                        <p className="mt-1 text-lg font-semibold">
+                          {state.recallMetrics.recallTimeMs.toFixed(3)} ms
+                        </p>
+
+                      </div>
+
+                      {/* ACCURACY */}
+                      <div className="rounded-lg bg-slate-50 p-4">
+
+                        <p className="text-xs text-slate-500">
+                          Accuracy
+                        </p>
+
+                        <p className="mt-1 text-lg font-semibold">
+                          {(
+                            state.recallMetrics
+                              .cellAccuracy * 100
+                          ).toFixed(1)}
+                          %
+                        </p>
+
+                      </div>
+
+
+                      {/* MATCHING CELLS */}
+                      <div className="rounded-lg bg-slate-50 p-4">
+
+                        <p className="text-xs text-slate-500">
+                          Matching cells
+                        </p>
+
+                        <p className="mt-1 text-lg font-semibold">
+                          {
+                            state.recallMetrics
+                              .matchingCells
                           }
-                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-800 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-                        >
-                          <option value={0.5}>0.5×</option>
-                          <option value={1}>1×</option>
-                          <option value={2}>2×</option>
-                        </select>
-                      </label>
+                          /
+                          {
+                            state.recallMetrics
+                              .totalCells
+                          }
+                        </p>
+
+                      </div>
+
+
+                      {/* SWEEPS */}
+                      <div className="rounded-lg bg-slate-50 p-4">
+
+                        <p className="text-xs text-slate-500">
+                          Sweeps
+                        </p>
+
+                        <p className="mt-1 text-lg font-semibold">
+                          {
+                            state.recallMetrics
+                              .sweeps
+                          }
+                        </p>
+
+                      </div>
+
+
+                      {/* CONVERGED */}
+                      <div className="rounded-lg bg-slate-50 p-4">
+
+                        <p className="text-xs text-slate-500">
+                          Converged
+                        </p>
+
+                        <p className="mt-1 text-lg font-semibold">
+                          {state.recallMetrics
+                            .converged
+                            ? "Yes"
+                            : "No"}
+                        </p>
+
+                      </div>
+
                     </div>
                     <p
                       className="mt-3 text-xs text-slate-500"

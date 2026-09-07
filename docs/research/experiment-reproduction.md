@@ -1,112 +1,87 @@
 # Reproducing the MemoryForge controlled experiments
 
-This uses code already in the repo (`src/engine/*.ts`, `src/experiments/*.ts`).
-No changes to the engine or metrics were needed — the experiment runner
-(`run-evaluation.ts`) already implements both controlled experiments; this
-run just executed it and post-processed the output.
+The dashboard and experiment runner use the actual 64-neuron Hebbian
+weight matrix and asynchronous Hopfield recall in `src/engine`.
+No model predictions or synthetic recall outcomes are substituted.
 
-## What was run
+## Run and verify
 
-Two controlled experiments, both built on the 64-neuron Hebbian/Hopfield
-engine in `src/engine`:
+From the repository root, with dependencies installed:
 
-1. **Noise experiment** — patterns fixed, noise increased.
-   `patternCount = 4`, `noisePercent ∈ {0, 10, 20, 30, 40, 50}`.
-2. **Memory-load experiment** — generation method fixed, memory load increased.
-   `noisePercent = 20`, `patternCount ∈ {1, 2, 4, 8, 12, 16}`.
-
-Both experiments were repeated across **5 seeds** (`11, 22, 33, 44, 55`) and,
-for each seed, every stored pattern was used as the recall **target** (up to
-4 targets per seed), for **215 total runs** (120 noise + 95 memory-load).
-`maxSweeps = 50` throughout.
-
-## Environment
-
-- Node.js v22 (uses `node --experimental-strip-types` to run `.ts` files
-  directly — no build step or extra dependencies required).
-- No changes were made to `package.json` / `node_modules`.
-
-## Steps
-
-From the repo root (`MemoryForge/`):
-
-```bash
-# Node's built-in TS loader needs explicit .ts extensions in relative
-# imports, which the source files don't use. Two options:
-
-# Option A — compile with the project's existing TypeScript toolchain,
-# then run the compiled JS with plain node:
-npx tsc --module esnext --target es2020 --outDir /tmp/mf-build \
-  src/engine/hebbian.ts src/engine/recall.ts \
-  src/experiments/evaluation.ts src/experiments/pattern.ts \
-  src/experiments/noise.ts src/experiments/run-evaluation.ts \
-  src/experiments/run_experiments.ts
-node /tmp/mf-build/experiments/run_experiments.js > experiment-results-raw.json
-
-# Option B — what was actually done here: copy the same files to a scratch
-# folder, add explicit .ts extensions to the relative import specifiers
-# (e.g. `from "./pattern"` -> `from "./pattern.ts"`), then run directly:
-node --experimental-strip-types experiments/run_experiments.ts > experiment-results-raw.json
+```sh
+npm test
+npm run build
+npm run lint
+npm run dev
 ```
 
-Either way, `run_experiments.ts` calls `generateExperimentJson()`, which:
+Open the local URL printed by Vite, choose **Experiment Dashboard**, then
+**Export full results (JSON)**. The dashboard computes all 215 runs in the
+browser and exports their configuration, aggregate statistics, chart
+breakdowns, selected examples, and individual metrics.
 
-1. Calls `runControlledExperiments()` — runs every (seed × target ×
-   noise-level) and (seed × target × pattern-count) combination described
-   above, using `createWeightMatrix` (Hebbian learning) and `recall`
-   (asynchronous Hopfield update) from `src/engine`.
-2. Calls `buildExperimentOutput()`, which computes aggregate stats
-   (`calculateAggregateStats`) and the framework's own best/worst example
-   picks (`selectSuccessExample` / `selectFailureExample`) from
-   `src/experiments/evaluation.ts` and `run-evaluation.ts`.
+For JSON from the command line, use the existing Vite TypeScript loader
+(no new dependency, temporary source copies, or import rewriting needed):
 
-The raw output of that step is a JSON document containing `configuration`,
-`sampleCounts`, `aggregate`, `selectedExamples`, and the full `results`
-array for both experiments — this is the basis for `experiment-results.json`
-delivered alongside this file.
+```sh
+node --input-type=module -e 'import {createServer} from "vite"; const s=await createServer({logLevel:"silent",server:{middlewareMode:true},appType:"custom"}); try {const m=await s.ssrLoadModule("/src/experiments/run-evaluation.ts"); console.log(m.generateExperimentJson());} finally {await s.close();}'
+```
 
-## What was added on top (post-processing)
+The command-line output uses `buildExperimentOutput` and its own automatic
+example selection. The dashboard additionally groups chart buckets and
+chooses guided presets from the strongest/weakest noise configurations.
+These are different selection policies applied to the same computed runs.
 
-`experiment-results.json` re-packages the raw run above and adds:
+## Experimental controls
 
-- **`breakdown`** — exact-recall rate, average cell accuracy, and average
-  sweeps grouped by `noisePercent` and by `patternCount`, computed directly
-  from `results.noise` / `results.memoryLoad` (simple `groupby` + mean —
-  no new engine or metric code).
-- **`findings`** — a plain-language summary of the two breakdowns.
-- **`selectedExamplesForGuidedDemo`** — see below. This is a different
-  selection than the framework's own `selectedExamples` (kept in the output
-  as `autoSelectedExamples_forComparison`), because the framework picks the
-  single fastest-converging exact recall / single lowest-accuracy run across
-  *all* runs, which can land on an edge case (e.g. its auto-picked success
-  example happens to be a 0%-noise run — trivially "successful" but not a
-  representative demo of noise tolerance).
+- Grid: 8×8, 64 bipolar cells; random patterns have 32 ON and 32 OFF cells.
+- Base seeds: 11, 22, 33, 44, 55.
+- Pattern at index `i`: generator seed `seed + i`.
+- Cue noise: seed `seed + 1000`; flip `round(64 × percent / 100)` distinct cells.
+- Recall order: seed `seed + 2000`; maximum 50 complete sweeps.
+- Zero local input preserves the neuron's old state.
+- Convergence means an entire sweep made no changes. It does not mean
+  the network recovered the intended target.
 
-## The two guided-demo presets
+| Experiment | Fixed | Varied | Samples |
+| --- | --- | --- | --- |
+| Noise | Four patterns per seed; all four targets | 0, 10, 20, 30, 40, 50% noise | 120 |
+| Memory load | Generator and 20% noise | 1, 2, 4, 8, 12, 16 patterns; first min(count, 4) targets | 95 |
 
-Both use the same `seed = 11`, target = `random-11`, `patternCount = 4`, so
-only the noise level changes between them — useful for showing side by side.
+The memory-load experiment does **not** evaluate every target when more
+than four patterns are stored.
 
-| | Success preset | Failure preset |
-|---|---|---|
-| seed | 11 | 11 |
-| target | random-11 | random-11 |
-| patternCount | 4 | 4 |
-| noisePercent | 20 | 50 |
-| Reliability | **20/20 (100%)** exact recall across all seeds/targets at this config | **0/20 (0%)** exact recall across all seeds/targets at this config |
+## Verified results and demo presets
 
-These aren't one-off lucky/unlucky runs — every sampled seed and target at
-`(patternCount=4, noisePercent=20)` recalls exactly, and every one at
-`(patternCount=4, noisePercent=50)` converges to a wrong state, per the
-`noiseExperiment_byNoisePercent` breakdown in `experiment-results.json`.
+The checked-in `src/experiments/results/recall-results.json` records 151/215
+exact recalls: 88/120 noise runs and 63/95 memory-load runs. All 215 runs
+converged. Regression tests compare every run's metrics with that artifact,
+excluding computation time, which varies by machine and run.
 
-## Files delivered
+The current dashboard chooses the highest tested noise level tied for the
+best exact-recall rate, and the lowest level tied for the worst rate:
 
-- `metrics.ts` — the metric functions used to score every run
-  (`cellAccuracy`, `exactRecall`, `bipolarOverlap`,
-  `overlapWithStoredPatterns`, `buildRecallMetrics`), copied unmodified from
-  `src/experiments/evaluation.ts`.
-- `experiment-results.json` — configuration, sample counts, aggregate
-  stats, per-level breakdowns, findings, the two selected demo presets
-  (with full metrics), and the complete raw results for both experiments.
-- `REPRODUCE.md` — this file.
+| Guided preset | Seed / target | Stored patterns | Noise | Exact recalls in sampled bucket |
+| --- | --- | --- | --- | --- |
+| Success | 11 / random-11 | 4 | 30% | 20/20 |
+| Failure | 11 / random-11 | 4 | 50% | 0/20 |
+
+The historical JSON's guided success example uses 20% noise, which also
+scored 20/20. That is not a contradiction with the live dashboard's 30% pick.
+
+Loading a preset replaces the lab memory bank and copies the exact cue,
+recall seed, and sweep limit. Press **Recall Memory** to reproduce it.
+Editing the cue, selecting a target, restoring the cue, adding noise, or
+storing another pattern invalidates the previous result and preset label.
+The lab's noise buttons regenerate a seeded copy from the original rather
+than accumulating flips on an already damaged cue.
+
+Playback shows the input cue at sweep zero, followed by the engine's
+recorded post-sweep states. Its frame match percentage describes the
+displayed state; the metrics below it describe the final computed output.
+Session JSON includes the cue, memory bank, recall seed, sweep limit,
+final metrics, and recorded snapshots.
+
+Sample success rates are not guarantees for other seeds, visual patterns,
+or memory loads. The failure analysis reports observed states without
+claiming that overlap metrics alone prove the cause of a failure.

@@ -11,43 +11,35 @@ function diagnose(
   targetPatternId: string,
   targetName: string,
 ): string {
+  if (!metrics.converged) {
+    return `Recall stopped after ${metrics.sweeps} sweeps without confirmed convergence. ` +
+      `The final output matches ${(metrics.cellAccuracy * 100).toFixed(1)}% of the target's cells; ` +
+      "it is not yet a confirmed stable memory.";
+  }
   if (metrics.exactRecall) {
     return `Recall succeeded — the network settled exactly on "${targetName}".`;
   }
 
-  const sorted = [...metrics.overlaps].sort(
+  const best = [...metrics.overlaps].sort(
     (a, b) => b.cellAccuracy - a.cellAccuracy,
-  );
-  const best = sorted[0];
+  )[0];
+  if (!best) return "No stored patterns were available to compare against.";
 
-  if (!best) {
-    return "No stored patterns were available to compare against.";
+  if (best.cellAccuracy === 1 && best.patternId !== targetPatternId) {
+    return `The network settled on a different stored memory, "${best.patternName}", instead of "${targetName}".`;
   }
 
-  if (best.patternId === targetPatternId) {
-    return (
-      `Close, but not exact: the network settled ${(best.cellAccuracy * 100).toFixed(1)}% ` +
-      `of the way to "${targetName}" and stopped there instead of converging the rest of ` +
-      `the way — the cue was too corrupted, or too many other memories are competing ` +
-      `for the same neurons.`
-    );
+  const inverted = metrics.overlaps.find((pattern) => pattern.overlap === -1);
+  if (inverted) {
+    return `The network settled on the exact inverse of "${inverted.patternName}" (every cell flipped), ` +
+      `not the intended target "${targetName}". Hebbian weights are unchanged when all cells ` +
+      "of a stored pattern change sign, so an inverted memory can also be a stable state.";
   }
 
-  if (best.cellAccuracy >= 0.8) {
-    return (
-      `Crosstalk: the network converged to a state that closely resembles a different ` +
-      `stored memory, "${best.patternName}" (${(best.cellAccuracy * 100).toFixed(1)}% match), ` +
-      `instead of the target "${targetName}". This happens when stored patterns overlap too ` +
-      `much for the network to tell them apart.`
-    );
-  }
-
-  return (
-    `Spurious state: the output doesn't closely match any stored pattern (best match is ` +
-    `"${best.patternName}" at ${(best.cellAccuracy * 100).toFixed(1)}%). This is the classic ` +
-    `Hopfield failure mode — too much noise or too many stored patterns pushed the network ` +
-    `into a stable state that was never actually stored.`
-  );
+  return `The network settled at a state that was not stored. Its nearest stored pattern is ` +
+    `"${best.patternName}" (${(best.cellAccuracy * 100).toFixed(1)}% matching cells). ` +
+    "This is a spurious fixed point. Cue noise and interference between memories can contribute, " +
+    "but these metrics alone do not establish the cause.";
 }
 
 export function FailureAnalysis({
