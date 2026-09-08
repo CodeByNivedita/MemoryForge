@@ -4,11 +4,14 @@
 
 **A small network. Shared memories. A result you can inspect.**
 
+[Live Demo](https://trymemoryforge.vercel.app/) · [GitHub Repository](https://github.com/indrasuthar07/MemoryForge)
+
 An interactive introduction to associative memory, Hebbian learning, and the surprising difference between a stable answer and a correct one.
 
 [Get started](#get-started) · [Explore the demo](#the-demo) · [How it works](#under-the-hood) · [Results](#the-evidence) · [BDH connection](#the-bdh-connection)
 
 React 19 · TypeScript · Vite 8 · Tailwind CSS 4
+
 </div>
 
 ## Why we built it
@@ -35,7 +38,6 @@ Start with **Learn**. A five-step experiment takes you from your first stored me
 
 ### Same clue. Different memory bank.
 
-
 |                                             | Four memories | Sixteen memories |
 | ------------------------------------------- | ------------- | ---------------- |
 | Damaged pixels                              | 13 / 64       | The same 13 / 64 |
@@ -49,8 +51,7 @@ This is a selected, reproducible example, not a universal capacity threshold. Th
 
 ## What you can explore
 
-
-| Page         | Start here when you want to…                                                                    |
+| Page         | Start here when you want to…                                                                     |
 | ------------ | ------------------------------------------------------------------------------------------------ |
 | **Home**     | Understand the idea and choose your starting point.                                              |
 | **Learn**    | Follow a guided experiment, then check your understanding.                                       |
@@ -60,11 +61,11 @@ This is a selected, reproducible example, not a universal capacity threshold. Th
 
 ### Look inside the computation
 
-- **Watch storage happen.** Replay the newest pattern's exact contribution to the weight matrix. Both connection directions update together; self-connections stay zero.
-- **Follow one neuron.** Inspect its previous state, weighted input, and recorded next state. Step through updates or whole sweeps.
-- **Change your view.** Switch between a pixel-aligned 2D map and a rotatable perspective view of the same 64 neurons.
-- **Inspect the evidence.** See energy by sweep, overlap with stored patterns, and recall performance across noise levels and memory loads.
-- **Take the results with you.** Export a Lab session or the experiment batch as JSON.
+* **Watch storage happen.** Replay the newest pattern's exact contribution to the weight matrix. Both connection directions update together; self-connections stay zero.
+* **Follow one neuron.** Inspect its previous state, weighted input, and recorded next state. Step through updates or whole sweeps.
+* **Change your view.** Switch between a pixel-aligned 2D map and a rotatable perspective view of the same 64 neurons.
+* **Inspect the evidence.** See energy by sweep, overlap with stored patterns, and recall performance across noise levels and memory loads.
+* **Take the results with you.** Export a Lab session or the experiment batch as JSON.
 
 Storage replay illustrates a matrix that has already been computed. Recall playback displays recorded states. **Neither playback speed nor camera position changes the mathematical result.** During recall, connections are highlighted for inspection; their weights do not change.
 
@@ -126,22 +127,22 @@ Update:         s[i] = +1        if h[i] > 0
 Energy:         E(s) = −½ Σᵢⱼ W[i,j] × s[i] × s[j]
 ```
 
-- **Exact recall:** every output cell matches the intended target.
-- **Cell accuracy:** matching cells divided by 64.
-- **Bipolar overlap:** `Σᵢ output[i] × pattern[i] / 64`. A value of +1 means identical, −1 means inverted, and 0 means half the cells match.
-- **Convergence:** a full sweep changed no states.
-- **Iteration limit:** the cap was reached without confirmed convergence.
-- **Recall time:** measured computation duration, which varies by device and instrumentation.
+* **Exact recall:** every output cell matches the intended target.
+* **Cell accuracy:** matching cells divided by 64.
+* **Bipolar overlap:** `Σᵢ output[i] × pattern[i] / 64`. A value of +1 means identical, −1 means inverted, and 0 means half the cells match.
+* **Convergence:** a full sweep changed no states.
+* **Iteration limit:** the cap was reached without confirmed convergence.
+* **Recall time:** measured computation duration, which varies by device and instrumentation.
 
 For this symmetric, zero-diagonal, asynchronous model, energy cannot increase. That does not guarantee the intended memory, the nearest stored pattern, or a global energy minimum.
 
 For `N` neurons, `P` stored patterns, and `S` sweeps:
 
-- Weight construction: `O(PN²)` time.
-- Recall: `O(SN²)` time.
-- Weight matrix: `O(N²)` space.
-- Full per-neuron state trace: up to `O(SN²)` additional space.
-- Sweep-only snapshots: `O(SN)` additional space.
+* Weight construction: `O(PN²)` time.
+* Recall: `O(SN²)` time.
+* Weight matrix: `O(N²)` space.
+* Full per-neuron state trace: up to `O(SN²)` additional space.
+* Sweep-only snapshots: `O(SN)` additional space.
 
 MemoryForge fixes `N = 64`.
 
@@ -167,21 +168,20 @@ The Evidence page runs the **same engine as the Lab**, live in the browser. Resu
 
 The experiment suite uses five base seeds `11, 22, 33, 44, 55`and random patterns containing exactly 32 ON and 32 OFF pixels.
 
-
-| Experiment  | Configuration                                                                | Runs | Exact recalls         |
-| ----------- | ---------------------------------------------------------------------------- | ---- | --------------------- |
-| Noise       | Four memories; 0–50% noise in 10-point steps; all four targets per seed     | 120  | **88 / 120 · 73.3%** |
+| Experiment  | Configuration                                                                | Runs | Exact recalls        |
+| ----------- | ---------------------------------------------------------------------------- | ---- | -------------------- |
+| Noise       | Four memories; 0–50% noise in 10-point steps; all four targets per seed      | 120  | **88 / 120 · 73.3%** |
 | Memory load | 1, 2, 4, 8, 12, or 16 memories; 20% noise; first up to four targets per load | 95   | **63 / 95 · 66.3%**  |
 
 All **215 runs converged**. Only **151 recalled the intended target exactly**. These figures were recomputed on 8 September 2026 and describe these configurations - not a general accuracy score.
 
 For reproducibility:
 
-- Pattern seed = base seed + pattern index.
-- Noise seed = base seed + 1000; recall seed = base seed + 2000.
-- Noise flips `round(64 × percentage / 100)` distinct cells.
-- Memory banks are nested for a given base seed.
-- Every run allows at most 50 sweeps.
+* Pattern seed = base seed + pattern index.
+* Noise seed = base seed + 1000; recall seed = base seed + 2000.
+* Noise flips `round(64 × percentage / 100)` distinct cells.
+* Memory banks are nested for a given base seed.
+* Every run allows at most 50 sweeps.
 
 The smallest memory loads have fewer evaluated targets, so the aggregate load curve is not a single-target controlled comparison. Visual shapes are a separate group; the reported rates do not apply to arbitrary drawings. Lines connect measured categories, not predictions for untested settings.
 
@@ -236,11 +236,11 @@ Visualizations use SVG. ESLint, Prettier, and Vitest are configured as developme
 
 MemoryForge is an educational model, not a biological brain, chatbot, or general-purpose image restoration system.
 
-- **Fixed scale:** 8 × 8 patterns and 64 neurons. Lab recall defaults to 100 sweeps; the lesson and batch experiments use 50. The engine accepts limits from 1 to 1,000.
-- **Local computation:** runs synchronously on the main thread. A worker with progress and cancellation is not implemented.
-- **Finite resources:** there is no explicit memory-bank cap, but larger banks and recorded traces cost time and memory. No universal sub-second performance claim is made.
-- **Session lifetime:** Lab state survives page navigation but resets on reload. JSON export is available; import, accounts, and server persistence are not.
-- **Release work:** the build blockers and missing tests above remain open. A complete accessibility audit and deployed desktop/mobile verification are also needed.
+* **Fixed scale:** 8 × 8 patterns and 64 neurons. Lab recall defaults to 100 sweeps; the lesson and batch experiments use 50. The engine accepts limits from 1 to 1,000.
+* **Local computation:** runs synchronously on the main thread. A worker with progress and cancellation is not implemented.
+* **Finite resources:** there is no explicit memory-bank cap, but larger banks and recorded traces cost time and memory. No universal sub-second performance claim is made.
+* **Session lifetime:** Lab state survives page navigation but resets on reload. JSON export is available; import, accounts, and server persistence are not.
+* **Release work:** the build blockers and missing tests above remain open. A complete accessibility audit and deployed desktop/mobile verification are also needed.
 
 ## Contributors
 
@@ -248,8 +248,8 @@ Built around the shared project plan of **Indra, Nivedita, Amrit, and Raghav**, 
 
 ## Sources
 
-- [Hopfield (1982)](https://doi.org/10.1073/pnas.79.8.2554) : *Neural networks and physical systems with emergent collective computational abilities*.
-- [The Dragon Hatchling](https://arxiv.org/html/2509.26507v1) : primary source for the BDH connection.
-- [Pathway's official BDH repository](https://github.com/pathwaycom/bdh)
-- [Research note](docs/research/associative_memory_and_bdh.md) : equations and the limits of the analogy.
-- [Reproduction notes](docs/research/experiment-reproduction.md) : experimental configuration and historical results. Their test-suite references predate the current checkout.
+* [Hopfield (1982)](https://doi.org/10.1073/pnas.79.8.2554) : *Neural networks and physical systems with emergent collective computational abilities*.
+* [The Dragon Hatchling](https://arxiv.org/html/2509.26507v1) : primary source for the BDH connection.
+* [Pathway's official BDH repository](https://github.com/pathwaycom/bdh)
+* [Research note](docs/research/associative_memory_and_bdh.md) : equations and the limits of the analogy.
+* [Reproduction notes](docs/research/experiment-reproduction.md) : experimental configuration and historical results. Their test-suite references predate the current checkout.
