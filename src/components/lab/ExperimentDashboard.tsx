@@ -8,6 +8,7 @@ import {
 import { generateRandomPattern, generateNoisyCopy } from '../../experiments';
 import type { LabScenario, StoredPattern } from '../lab/patterns';
 import { BarChart } from './charts/barchart';
+import { LineChart } from './charts/linechart';
 import { downloadJson } from '../../../utils/download/download';
 
 const panel = 'surface-panel p-5 sm:p-6';
@@ -320,18 +321,39 @@ export function ExperimentDashboard({
             Memory load ↑, generator fixed (20% noise)
           </h3>
           <p className="mb-4 text-xs text-slate-500">
-            Exact recall rate by number of stored patterns
+            Cell accuracy (% of pixels matching the target) and exact recall
+            rate, by number of stored patterns
           </p>
 
-          <BarChart
-            maxValue={1}
-            ariaLabel="Exact recall rate by pattern count"
-            data={data.loadBuckets.map((b) => ({
-              label: `${b.key}`,
-              value: b.exactRecallRate,
-              detail: `(n=${b.n})`,
-            }))}
+          <LineChart
+            ariaLabel="Cell accuracy and exact recall rate by number of stored patterns"
+            xAxisLabel="Number of stored patterns"
+            labels={data.loadBuckets.map((b) => `${b.key}`)}
+            series={[
+              {
+                name: 'Cell accuracy (% pixels matching target)',
+                color: '#0891b2',
+                values: data.loadBuckets.map((b) => b.averageCellAccuracy),
+              },
+              {
+                name: 'Exact recall rate',
+                color: '#be123c',
+                values: data.loadBuckets.map((b) => b.exactRecallRate),
+              },
+            ]}
           />
+
+          <ul className="mt-4 flex flex-col gap-1 text-xs text-slate-500">
+            {data.loadBuckets.map((b) => (
+              <li key={b.key} className="flex justify-between gap-3">
+                <span>{b.key} stored patterns (n={b.n})</span>
+                <span className="tabular-nums text-slate-600">
+                  {(b.averageCellAccuracy * 100).toFixed(1)}% cell accuracy ·{' '}
+                  {(b.exactRecallRate * 100).toFixed(0)}% exact recall
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       </div>
 

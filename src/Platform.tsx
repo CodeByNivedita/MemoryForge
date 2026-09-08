@@ -111,7 +111,7 @@ export default function Platform() {
               href="#home"
               className="text-lg font-semibold tracking-tight xl:hidden"
             >
-              MemoryForge<span className="text-blue-600">.</span>
+              MemoryForge
             </a>
             <div className="hidden items-center gap-3 text-sm xl:flex">
               <span className="text-slate-400">Workspace</span>
