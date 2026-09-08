@@ -8,7 +8,7 @@ import {
 import { generateRandomPattern, generateNoisyCopy } from '../experiments';
 import type { LabScenario, StoredPattern } from '../components/lab/patterns';
 import { BarChart } from '../components/lab/charts/barchart';
-import { LineChart } from '../components/lab/charts/Linechart';
+import { LineChart } from '../components/lab/charts/linechart';
 import { downloadJson } from '../../utils/download/download';
 
 const panel = 'surface-panel p-5 sm:p-6';
