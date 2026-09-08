@@ -1,4 +1,3 @@
-
 import type { PatternCells } from "./pattern";
 
 const CELL_COUNT = 64;

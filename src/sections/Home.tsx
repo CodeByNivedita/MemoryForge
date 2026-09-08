@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { Icon } from '../components/Icon';
-
 const paths = [
   {
     id: 'learn',

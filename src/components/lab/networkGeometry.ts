@@ -1,4 +1,3 @@
-/** Camera-only geometry: neuron identity and network mathematics never depend on position. */
 export function projectNeurons(rotation: number, spatial: boolean) {
   return Array.from({ length: 64 }, (_, i) => {
     if (!spatial) {
